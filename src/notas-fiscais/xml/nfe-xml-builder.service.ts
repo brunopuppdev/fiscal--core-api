@@ -3,6 +3,8 @@ import { create } from 'xmlbuilder2';
 import { EmitenteConfig } from '../../config/configuration';
 import { ModeloDocumento } from '../../common/enums/modelo-documento.enum';
 import { CODIGO_UF } from '../../common/utils/chave-acesso.util';
+import { formatarDataHoraNfe } from '../../common/utils/data-hora-nfe.util';
+import { calcularIdDest } from '../../common/utils/id-dest.util';
 import { DestinatarioDto } from '../dto/destinatario.dto';
 import { ItemNotaDto } from '../dto/item-nota.dto';
 
@@ -41,7 +43,7 @@ export class NfeXmlBuilderService {
       0,
     );
 
-    const dhEmi = this.formatarDataHora(dados.dataEmissao);
+    const dhEmi = formatarDataHoraNfe(dados.dataEmissao);
     const cUF = CODIGO_UF[emitente.uf.toUpperCase()] ?? '35';
 
     const doc = create({ version: '1.0', encoding: 'UTF-8' })
@@ -61,7 +63,9 @@ export class NfeXmlBuilderService {
     ide.ele('nNF').txt(String(dados.numero));
     ide.ele('dhEmi').txt(dhEmi);
     ide.ele('tpNF').txt('1'); // 1 = saída
-    ide.ele('idDest').txt(this.calcularIdDest(emitente, dados.destinatario));
+    ide
+      .ele('idDest')
+      .txt(calcularIdDest(emitente.uf, dados.destinatario?.endereco?.uf));
     ide.ele('cMunFG').txt(emitente.codMunicipio);
     ide.ele('tpImp').txt(isNfce ? '4' : '1'); // 4 = DANFE NFC-e, 1 = DANFE retrato
     ide.ele('tpEmis').txt('1'); // 1 = emissão normal
@@ -213,29 +217,5 @@ export class NfeXmlBuilderService {
       );
 
     return doc.end({ prettyPrint: false });
-  }
-
-  private calcularIdDest(
-    emitente: EmitenteConfig,
-    destinatario?: DestinatarioDto,
-  ): string {
-    const ufDest = destinatario?.endereco?.uf;
-    if (!ufDest) return '1'; // sem endereço do destinatário: assume operação interna
-    if (ufDest.toUpperCase() === emitente.uf.toUpperCase()) return '1'; // interna
-    return '2'; // interestadual
-  }
-
-  private formatarDataHora(data: Date): string {
-    // Formato exigido: AAAA-MM-DDThh:mm:ssTZD (ex.: -03:00 para horário de Brasília)
-    const pad = (n: number) => n.toString().padStart(2, '0');
-    const offsetMin = -data.getTimezoneOffset();
-    const sinal = offsetMin >= 0 ? '+' : '-';
-    const offsetH = pad(Math.floor(Math.abs(offsetMin) / 60));
-    const offsetM = pad(Math.abs(offsetMin) % 60);
-    return (
-      `${data.getFullYear()}-${pad(data.getMonth() + 1)}-${pad(data.getDate())}` +
-      `T${pad(data.getHours())}:${pad(data.getMinutes())}:${pad(data.getSeconds())}` +
-      `${sinal}${offsetH}:${offsetM}`
-    );
   }
 }
