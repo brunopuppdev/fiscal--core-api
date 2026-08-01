@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { create } from 'xmlbuilder2';
 import { EmitenteConfig } from '../../config/configuration';
 import { ModeloDocumento } from '../../common/enums/modelo-documento.enum';
+import { AppLogger } from '../../common/logger/app-logger';
 import { CODIGO_UF } from '../../common/utils/chave-acesso.util';
 import { formatarDataHoraNfe } from '../../common/utils/data-hora-nfe.util';
 import { calcularIdDest } from '../../common/utils/id-dest.util';
@@ -34,6 +35,8 @@ const fmt = (valor: number, casas: number): string => valor.toFixed(casas);
  */
 @Injectable()
 export class NfeXmlBuilderService {
+  private readonly logger = new AppLogger(NfeXmlBuilderService.name);
+
   montar(dados: DadosMontagemNfe): string {
     const { emitente, itens } = dados;
     const isNfce = dados.modelo === ModeloDocumento.NFCE;
@@ -106,10 +109,15 @@ export class NfeXmlBuilderService {
       } else if (documento && documento.length === 11) {
         dest.ele('CPF').txt(documento);
       } else if (!isNfce) {
-        // NF-e (55) exige identificação do destinatário
-        throw new Error(
-          'destinatario.documento é obrigatório para NF-e (modelo 55).',
+        // NF-e (55) exige identificação do destinatário. Em condições normais
+        // NotasFiscaisService.emitir já barra isso antes de chamar o builder — chegar
+        // aqui indica uma inconsistência entre as duas validações, por isso o warn.
+        const mensagem =
+          'destinatario.documento é obrigatório para NF-e (modelo 55).';
+        this.logger.warn(
+          `Falha ao montar XML [chave=${dados.chaveAcesso}]: ${mensagem}`,
         );
+        throw new Error(mensagem);
       }
       if (dados.destinatario.nome)
         dest.ele('xNome').txt(dados.destinatario.nome);

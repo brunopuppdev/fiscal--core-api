@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { SignedXml } from 'xml-crypto';
 import { CertificadoService } from '../../certificado/certificado.service';
+import { AppLogger } from '../../common/logger/app-logger';
 
 /**
  * Assina o elemento <infNFe> conforme exigido pela NF-e (assinatura enveloped,
@@ -9,6 +10,8 @@ import { CertificadoService } from '../../certificado/certificado.service';
  */
 @Injectable()
 export class NfeXmlSignerService {
+  private readonly logger = new AppLogger(NfeXmlSignerService.name);
+
   constructor(private readonly certificadoService: CertificadoService) {}
 
   assinar(xml: string): string {
@@ -33,12 +36,20 @@ export class NfeXmlSignerService {
       digestAlgorithm: 'http://www.w3.org/2000/09/xmldsig#sha1',
     });
 
-    sig.computeSignature(xml, {
-      location: {
-        reference: `//*[local-name(.)='infNFe']`,
-        action: 'after',
-      },
-    });
+    try {
+      sig.computeSignature(xml, {
+        location: {
+          reference: `//*[local-name(.)='infNFe']`,
+          action: 'after',
+        },
+      });
+    } catch (error) {
+      // Sem dado do certificado/chave na mensagem: só o tipo de falha, para diagnóstico.
+      this.logger.error(
+        `Falha ao assinar XML da NFe: ${(error as Error).message}`,
+      );
+      throw error;
+    }
 
     return sig.getSignedXml();
   }

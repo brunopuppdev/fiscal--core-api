@@ -3,10 +3,13 @@ import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module';
+import { AppLogger } from './common/logger/app-logger';
 import { AppConfig } from './config/configuration';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  // Logger global: até as mensagens internas do Nest (bootstrap, rotas mapeadas)
+  // saem no mesmo formato com ícone/cor do AppLogger, não só os logs dos services.
+  const app = await NestFactory.create(AppModule, { logger: new AppLogger() });
 
   app.useGlobalPipes(
     new ValidationPipe({

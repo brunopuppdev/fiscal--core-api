@@ -7,6 +7,7 @@ import { ConfigService } from '@nestjs/config';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
 import { AppConfig } from '../config/configuration';
+import { AppLogger } from '../common/logger/app-logger';
 import { ModeloDocumento } from '../common/enums/modelo-documento.enum';
 import { StatusNota } from '../common/enums/status-nota.enum';
 import {
@@ -24,6 +25,8 @@ import { NfeXmlSignerService } from './xml/nfe-xml-signer.service';
 
 @Injectable()
 export class NotasFiscaisService {
+  private readonly logger = new AppLogger(NotasFiscaisService.name);
+
   constructor(
     @InjectRepository(NotaFiscal)
     private readonly notaFiscalRepo: Repository<NotaFiscal>,
@@ -50,12 +53,18 @@ export class NotasFiscaisService {
         ? numeracao.nfeSerie
         : numeracao.nfceSerie;
 
+    this.logger.log(`Iniciando emissão: modelo=${dto.modelo} série=${serie}`);
+
     const dataEmissao = new Date();
     const codigoNumerico = gerarCodigoNumerico();
 
     // Reserva o próximo número da série dentro de uma transação com lock,
     // garantindo numeração sequencial mesmo sob concorrência.
     const numero = await this.proximoNumero(dto.modelo, serie);
+
+    this.logger.log(
+      `Número reservado: modelo=${dto.modelo} série=${serie} número=${numero}`,
+    );
 
     const chaveAcesso = montarChaveAcesso({
       uf: CODIGO_UF[emitente.uf.toUpperCase()] ?? '35',
@@ -67,6 +76,8 @@ export class NotasFiscaisService {
       tipoEmissao: 1,
       codigoNumerico,
     });
+
+    this.logger.log(`Chave de acesso gerada [chave=${chaveAcesso}]`);
 
     const xml = this.xmlBuilder.montar({
       chaveAcesso,
@@ -83,6 +94,8 @@ export class NotasFiscaisService {
     });
 
     const xmlAssinado = this.xmlSigner.assinar(xml);
+
+    this.logger.log(`XML assinado [chave=${chaveAcesso}]`);
 
     const valorTotal = dto.itens.reduce(
       (acc, item) => acc + item.quantidade * item.valorUnitario,
@@ -126,6 +139,10 @@ export class NotasFiscaisService {
 
     nota = await this.notaFiscalRepo.save(nota);
 
+    this.logger.log(
+      `Nota persistida com status ASSINADA antes do envio à SEFAZ [chave=${chaveAcesso}]`,
+    );
+
     try {
       const retorno = await this.sefazClient.autorizar(
         xmlAssinado,
@@ -144,12 +161,22 @@ export class NotasFiscaisService {
         nota.xmlAutorizado = retorno.xmlProtocolo
           ? `<?xml version="1.0" encoding="UTF-8"?><nfeProc versao="4.00" xmlns="http://www.portalfiscal.inf.br/nfe">${xmlAssinado}${retorno.xmlProtocolo}</nfeProc>`
           : xmlAssinado;
+        this.logger.success(
+          `Nota AUTORIZADA pela SEFAZ [chave=${chaveAcesso}] protocolo=${nota.protocolo} cStat=${retorno.cStat}`,
+        );
       } else {
         nota.status = StatusNota.REJEITADA;
+        this.logger.warn(
+          `Nota REJEITADA pela SEFAZ [chave=${chaveAcesso}] cStat=${retorno.cStat} xMotivo=${retorno.xMotivo}`,
+        );
       }
     } catch (error) {
       nota.status = StatusNota.ERRO;
       nota.motivoStatus = (error as Error).message.slice(0, 255);
+      this.logger.error(
+        `ERRO ao enviar nota à SEFAZ [chave=${chaveAcesso}]: ${(error as Error).message}`,
+        (error as Error).stack,
+      );
     }
 
     return this.notaFiscalRepo.save(nota);

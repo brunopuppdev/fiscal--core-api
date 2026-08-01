@@ -8,6 +8,7 @@ import * as fs from 'fs';
 import * as https from 'https';
 import * as forge from 'node-forge';
 import { AppConfig } from '../config/configuration';
+import { AppLogger } from '../common/logger/app-logger';
 
 export interface CertificadoCarregado {
   /** Chave privada em PEM, usada para assinar o XML (xml-crypto). */
@@ -29,6 +30,7 @@ export interface CertificadoCarregado {
  */
 @Injectable()
 export class CertificadoService implements OnModuleInit {
+  private readonly logger = new AppLogger(CertificadoService.name);
   private certificado: CertificadoCarregado | null = null;
   private pfxBuffer: Buffer | null = null;
   private senha = '';
@@ -47,6 +49,9 @@ export class CertificadoService implements OnModuleInit {
     if (!fs.existsSync(path)) {
       // Não derruba a aplicação: permite subir o serviço (ex.: para ver o Swagger)
       // mesmo sem certificado configurado ainda. A emissão real falhará com erro claro.
+      this.logger.warn(
+        `Certificado digital não encontrado em "${path}". A aplicação seguirá no ar, mas operações que dependem do certificado falharão.`,
+      );
       return;
     }
 
@@ -81,13 +86,25 @@ export class CertificadoService implements OnModuleInit {
         ? String(cnpjAttr.value).match(/(\d{14})/)
         : null;
 
+      const cnpj = cnMatch ? cnMatch[1] : null;
+
       this.certificado = {
         chavePrivadaPem,
         certificadoPem,
-        cnpj: cnMatch ? cnMatch[1] : null,
+        cnpj,
         validade: certBag.cert.validity.notAfter,
       };
+
+      // CNPJ mascarado por precaução: mesmo sendo o CNPJ do próprio emitente
+      // (não é segredo), evitamos expor o dado completo em log.
+      const cnpjMascarado = cnpj ? `***${cnpj.slice(-4)}` : 'não identificado';
+      this.logger.success(
+        `Certificado digital carregado com sucesso [cnpj=${cnpjMascarado} validade=${this.certificado.validade.toISOString()}]`,
+      );
     } catch (error) {
+      this.logger.error(
+        `Falha ao carregar certificado digital (.pfx): ${(error as Error).message}`,
+      );
       throw new InternalServerErrorException(
         `Falha ao carregar certificado digital (.pfx). Verifique o caminho e a senha configurados. Detalhe: ${
           (error as Error).message

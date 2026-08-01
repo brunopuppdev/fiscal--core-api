@@ -4,6 +4,7 @@ import { XMLParser } from 'fast-xml-parser';
 import { AppConfig } from '../../config/configuration';
 import { getSefazEndpoints } from '../../config/sefaz-endpoints';
 import { CertificadoService } from '../../certificado/certificado.service';
+import { AppLogger } from '../../common/logger/app-logger';
 import { CODIGO_UF } from '../../common/utils/chave-acesso.util';
 import { montarEnvelopeSoap } from './soap-envelope.util';
 import { postSoap } from './soap-http.util';
@@ -58,6 +59,7 @@ function objeto(valor: unknown): NoXml | undefined {
  */
 @Injectable()
 export class SefazClientService {
+  private readonly logger = new AppLogger(SefazClientService.name);
   private readonly parser = new XMLParser({ ignoreAttributes: false });
 
   constructor(
@@ -79,24 +81,43 @@ export class SefazClientService {
       `<tpAmb>${ambiente}</tpAmb><cUF>${cUF}</cUF><xServ>STATUS</xServ></consStatServ>`;
 
     const envelope = montarEnvelopeSoap(NS.status, corpo);
-    const resposta = await postSoap(
-      NFeStatusServico4,
-      NS.status,
-      envelope,
-      this.certificadoService.obterHttpsAgent(),
+
+    this.logger.log(
+      `Chamando SEFAZ [webservice=NFeStatusServico4 uf=${uf} ambiente=${ambiente}]`,
     );
+
+    let resposta: string;
+    try {
+      resposta = await postSoap(
+        NFeStatusServico4,
+        NS.status,
+        envelope,
+        this.certificadoService.obterHttpsAgent(),
+      );
+    } catch (error) {
+      this.logger.error(
+        `Falha de comunicação com a SEFAZ [webservice=NFeStatusServico4]: ${(error as Error).message}`,
+      );
+      throw error;
+    }
 
     const ret = this.buscarProfundo(
       this.parser.parse(resposta),
       'retConsStatServ',
     );
     if (!ret) {
+      this.logger.error(
+        'Resposta inesperada da SEFAZ ao consultar status do serviço.',
+      );
       throw new ServiceUnavailableException(
         'Resposta inesperada da SEFAZ ao consultar status do serviço.',
       );
     }
 
     const cStat = texto(ret.cStat);
+    this.logger.log(
+      `Retorno SEFAZ [webservice=NFeStatusServico4]: cStat=${cStat} xMotivo=${texto(ret.xMotivo)}`,
+    );
     return {
       cStat,
       xMotivo: texto(ret.xMotivo),
@@ -112,22 +133,38 @@ export class SefazClientService {
     xmlNfeAssinado: string,
     idLote: number,
   ): Promise<RetornoAutorizacao> {
-    const { NFeAutorizacao4 } = this.endpoints();
+    const { NFeAutorizacao4, uf, ambiente } = this.endpoints();
 
     const corpo =
       `<enviNFe versao="4.00" xmlns="http://www.portalfiscal.inf.br/nfe">` +
       `<idLote>${idLote}</idLote><indSinc>1</indSinc>${xmlNfeAssinado}</enviNFe>`;
 
     const envelope = montarEnvelopeSoap(NS.autorizacao, corpo);
-    const resposta = await postSoap(
-      NFeAutorizacao4,
-      NS.autorizacao,
-      envelope,
-      this.certificadoService.obterHttpsAgent(),
+
+    this.logger.log(
+      `Chamando SEFAZ [webservice=NFeAutorizacao4 uf=${uf} ambiente=${ambiente} idLote=${idLote}]`,
     );
+
+    let resposta: string;
+    try {
+      resposta = await postSoap(
+        NFeAutorizacao4,
+        NS.autorizacao,
+        envelope,
+        this.certificadoService.obterHttpsAgent(),
+      );
+    } catch (error) {
+      this.logger.error(
+        `Falha de comunicação com a SEFAZ [webservice=NFeAutorizacao4 idLote=${idLote}]: ${(error as Error).message}`,
+      );
+      throw error;
+    }
 
     const ret = this.buscarProfundo(this.parser.parse(resposta), 'retEnviNFe');
     if (!ret) {
+      this.logger.error(
+        `Resposta inesperada da SEFAZ ao autorizar a NF-e [idLote=${idLote}].`,
+      );
       throw new ServiceUnavailableException(
         'Resposta inesperada da SEFAZ ao autorizar a NF-e.',
       );
@@ -137,6 +174,9 @@ export class SefazClientService {
 
     if (infProt) {
       const cStat = texto(infProt.cStat);
+      this.logger.log(
+        `Retorno SEFAZ [webservice=NFeAutorizacao4 idLote=${idLote}]: cStat=${cStat} xMotivo=${texto(infProt.xMotivo)}`,
+      );
       return {
         cStat,
         xMotivo: texto(infProt.xMotivo),
@@ -150,6 +190,9 @@ export class SefazClientService {
     // Lote recebido mas ainda não processado (cStat 103/105) — seria necessário
     // consultar depois via NFeRetAutorizacao4 (não implementado aqui por não se
     // aplicar ao fluxo síncrono padrão, mas fica registrado para evolução).
+    this.logger.warn(
+      `Retorno SEFAZ [webservice=NFeAutorizacao4 idLote=${idLote}] sem infProt: cStat=${texto(ret.cStat)} xMotivo=${texto(ret.xMotivo)}`,
+    );
     return {
       cStat: texto(ret.cStat),
       xMotivo: texto(ret.xMotivo),
@@ -158,19 +201,32 @@ export class SefazClientService {
   }
 
   async consultarProtocolo(chaveAcesso: string): Promise<RetornoAutorizacao> {
-    const { NFeConsultaProtocolo4, ambiente } = this.endpoints();
+    const { NFeConsultaProtocolo4, uf, ambiente } = this.endpoints();
 
     const corpo =
       `<consSitNFe versao="4.00" xmlns="http://www.portalfiscal.inf.br/nfe">` +
       `<tpAmb>${ambiente}</tpAmb><xServ>CONSULTAR</xServ><chNFe>${chaveAcesso}</chNFe></consSitNFe>`;
 
     const envelope = montarEnvelopeSoap(NS.consultaProtocolo, corpo);
-    const resposta = await postSoap(
-      NFeConsultaProtocolo4,
-      NS.consultaProtocolo,
-      envelope,
-      this.certificadoService.obterHttpsAgent(),
+
+    this.logger.log(
+      `Chamando SEFAZ [webservice=NFeConsultaProtocolo4 uf=${uf} ambiente=${ambiente} chave=${chaveAcesso}]`,
     );
+
+    let resposta: string;
+    try {
+      resposta = await postSoap(
+        NFeConsultaProtocolo4,
+        NS.consultaProtocolo,
+        envelope,
+        this.certificadoService.obterHttpsAgent(),
+      );
+    } catch (error) {
+      this.logger.error(
+        `Falha de comunicação com a SEFAZ [webservice=NFeConsultaProtocolo4 chave=${chaveAcesso}]: ${(error as Error).message}`,
+      );
+      throw error;
+    }
 
     const ret = this.buscarProfundo(
       this.parser.parse(resposta),
@@ -179,6 +235,9 @@ export class SefazClientService {
     const infProt = objeto(objeto(ret?.protNFe)?.infProt);
 
     if (!infProt) {
+      this.logger.warn(
+        `Retorno SEFAZ [webservice=NFeConsultaProtocolo4 chave=${chaveAcesso}] sem infProt: cStat=${texto(ret?.cStat)} xMotivo=${texto(ret?.xMotivo, 'Sem retorno da SEFAZ')}`,
+      );
       return {
         cStat: texto(ret?.cStat),
         xMotivo: texto(ret?.xMotivo, 'Sem retorno da SEFAZ'),
@@ -187,6 +246,9 @@ export class SefazClientService {
     }
 
     const cStat = texto(infProt.cStat);
+    this.logger.log(
+      `Retorno SEFAZ [webservice=NFeConsultaProtocolo4 chave=${chaveAcesso}]: cStat=${cStat} xMotivo=${texto(infProt.xMotivo)}`,
+    );
     return {
       cStat,
       xMotivo: texto(infProt.xMotivo),
