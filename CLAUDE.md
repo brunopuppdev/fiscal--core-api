@@ -8,6 +8,56 @@ API NestJS para emissão de notas fiscais de venda como MEI — NF-e (modelo 55)
 
 Documentação completa em `docs/`: `visao-geral.md` (motivação/escopo), `arquitetura.md` (stack, fluxo de emissão, modelo de dados), `guia-fiscal.md` (NF-e vs NFC-e, CSOSN/CFOP/NCM, certificado digital), `integracao-sefaz.md` (webservices, SOAP, mTLS, códigos de retorno), `roadmap.md` (limitações conhecidas), `api.md` (referência de endpoints).
 
+## Agentes especialistas do projeto
+
+Este repositório define subagentes em `.claude/agents/` para as áreas de maior risco/especificidade do projeto. Prefira delegar a eles em vez de tentar cobrir tudo sozinho quando a tarefa cair claramente em um desses domínios:
+
+| Agente | Quando usar |
+|---|---|
+| `nestjs-backend-specialist` | Endpoints, services, DTOs, entidades TypeORM, mudanças no fluxo de emissão — implementação geral de backend NestJS. |
+| `sql-specialist` | Modelagem de schema, queries, índices, migrations, transações e locking no PostgreSQL/TypeORM. |
+| `contabilidade-fiscal-specialist` | Dúvidas ou validação sobre CSOSN, CST, CFOP, NCM, CRT, regras de MEI/Simples Nacional, diagnóstico de rejeição da SEFAZ (`cStat`/`xMotivo`). |
+| `security-crypto-specialist` | Certificado digital (`.pfx`), mTLS, assinatura XML-DSig, tratamento de segredos (senha do certificado, chave privada, CNPJ/CPF). |
+| `testing-specialist` | Escrever/revisar testes unitários e e2e (Jest), incluindo como mockar certificado, banco e respostas SOAP da SEFAZ. |
+| `logging-specialist` | Desenhar e implementar logging — o que logar em cada camada, nível, correlação entre logs de uma mesma emissão, o que nunca logar. |
+
+Cada agente tem seu próprio arquivo com o detalhamento das convenções específicas daquele domínio — leia o arquivo correspondente antes de delegar uma tarefa complexa.
+
+## Como abordar uma tarefa
+
+Antes de alterar qualquer código:
+
+1. Entenda o problema e o comportamento esperado.
+2. Localize os arquivos e implementações semelhantes envolvidos na funcionalidade, antes de criar algo novo.
+3. Identifique services, repositories, controllers, DTOs, entidades TypeORM e testes relacionados, e os padrões/versões das tecnologias já usadas no módulo afetado.
+4. Verifique as chamadas e dependências do código afetado, e possíveis efeitos colaterais.
+5. Confirme se já existe helper, utilitário ou service reutilizável (`common/utils/`, services injetáveis do Nest) antes de criar um novo.
+6. Verifique como transações e acesso ao banco são tratados no fluxo atual (`Repository` injetado para leitura/escrita simples, `dataSource.transaction` só onde já existe, como em `numeracao_controle`).
+7. Verifique impactos em regras de negócio fiscais e nos endpoints da API — este projeto não tem front-end.
+8. Para alterações de maior impacto (mudança de schema, do fluxo de emissão ou da integração SEFAZ), apresente um plano breve antes de implementar.
+
+Ao decidir entre abordagens, priorize nesta ordem: **correção e aderência ao projeto** → manutenibilidade/legibilidade → testabilidade → performance → simplicidade.
+
+## Controle de escopo
+
+- Altere somente os arquivos necessários para atender à solicitação.
+- Não formate arquivos inteiros quando a alteração for localizada.
+- Não refatore código não relacionado à tarefa.
+- Não renomeie classes, métodos, campos, endpoints ou entidades sem necessidade.
+- Não altere contratos públicos (endpoints, DTOs, assinaturas de service) sem explicitar o impacto.
+- Não altere versões de dependências nem introduza novas bibliotecas sem autorização explícita.
+- Não mude a arquitetura de um módulo apenas por preferência técnica.
+- Prefira alterações pequenas, incrementais e revisáveis.
+- Preserve compatibilidade com o comportamento existente, salvo quando a mudança for parte explícita da tarefa.
+
+## Regras gerais
+
+- Não crie abstrações sem pelo menos um caso concreto de reutilização.
+- Mantenha linhas com no máximo 120 caracteres.
+- Escreva código, comentários, testes e commits em português do Brasil — já é o padrão do projeto para o domínio fiscal.
+- Não execute comandos destrutivos sem autorização explícita.
+- Não faça commit ou push sem solicitação explícita.
+
 ## Comandos
 
 ```bash
@@ -61,6 +111,15 @@ Webservices usados: `NFeStatusServico4` (consulta status) e `NFeAutorizacao4` (a
 - `numeracao_controle` — uma linha por `modelo` + `serie`; única tabela usada com lock pessimista.
 
 Em desenvolvimento o schema é criado via `DB_SYNCHRONIZE=true` — não há migrations versionadas.
+
+### Padrões de back-end
+
+- Respeite a separação **controller (HTTP) → service (regra de negócio) → repository/entity (TypeORM)** — controllers ficam finos e delegam ao service; regra de negócio nunca vai para o controller ou para a entidade.
+- Use o `Repository` injetado (`@InjectRepository`) para leitura e escrita simples. Use `dataSource.transaction(manager => ...)` (via `@InjectDataSource`) só quando a operação precisar da mesma garantia transacional já usada em `numeracao_controle` — não abra transação nova sem necessidade comprovada.
+- Preserve as fronteiras transacionais existentes, em especial a ordem do fluxo de emissão descrita acima (numeração → XML → assinatura → persistência antes do envio SEFAZ → envio → atualização de status).
+- Mantenha métodos curtos, coesos e com responsabilidade única.
+- Prefira `?.`/`??` do TypeScript para checagens de nulidade quando isso melhorar a legibilidade.
+- Não registre credenciais, senha do certificado, chave privada ou dados sensíveis (CNPJ/CPF) em logs.
 
 ## Convenções do projeto
 
