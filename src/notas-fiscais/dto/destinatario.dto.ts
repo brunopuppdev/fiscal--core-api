@@ -1,5 +1,6 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsOptional, IsString, Length } from 'class-validator';
+import { Type } from 'class-transformer';
+import { IsOptional, IsString, Length, ValidateNested } from 'class-validator';
 
 export class EnderecoDestinatarioDto {
   @ApiPropertyOptional({ example: 'Rua das Flores' })
@@ -64,5 +65,7 @@ export class DestinatarioDto {
 
   @ApiPropertyOptional({ type: () => EnderecoDestinatarioDto })
   @IsOptional()
+  @ValidateNested()
+  @Type(() => EnderecoDestinatarioDto)
   endereco?: EnderecoDestinatarioDto;
 }

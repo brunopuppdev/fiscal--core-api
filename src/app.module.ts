@@ -5,6 +5,22 @@ import configuration, { AppConfig } from './config/configuration';
 import { CertificadoModule } from './certificado/certificado.module';
 import { NotasFiscaisModule } from './notas-fiscais/notas-fiscais.module';
 
+export function criarConfigTypeOrm(
+  configService: ConfigService<AppConfig, true>,
+): TypeOrmModuleOptions {
+  const db = configService.get('database', { infer: true });
+  return {
+    type: 'postgres',
+    host: db.host,
+    port: db.port,
+    username: db.username,
+    password: db.password,
+    database: db.database,
+    synchronize: db.synchronize,
+    autoLoadEntities: true,
+  };
+}
+
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -13,21 +29,7 @@ import { NotasFiscaisModule } from './notas-fiscais/notas-fiscais.module';
     }),
     TypeOrmModule.forRootAsync({
       inject: [ConfigService],
-      useFactory: (
-        configService: ConfigService<AppConfig, true>,
-      ): TypeOrmModuleOptions => {
-        const db = configService.get('database', { infer: true });
-        return {
-          type: 'postgres',
-          host: db.host,
-          port: db.port,
-          username: db.username,
-          password: db.password,
-          database: db.database,
-          synchronize: db.synchronize,
-          autoLoadEntities: true,
-        };
-      },
+      useFactory: criarConfigTypeOrm,
     }),
     CertificadoModule,
     NotasFiscaisModule,
