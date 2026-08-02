@@ -69,10 +69,20 @@ npm test                 # testes unitários (Jest)
 npm run test:watch       # Jest em modo watch
 npx jest caminho/para/arquivo.spec.ts   # rodar um único teste
 npm run test:cov         # Jest com cobertura
+npm run test:cov:open    # test:cov + abre o relatório HTML (Istanbul) no navegador
+npm run test:report:open # roda os testes unitários + abre o dashboard (jest-html-reporters)
 npm run test:e2e         # testes e2e (config em test/jest-e2e.json)
+npm run test:integration # testes de integração: sobe Postgres descartável (Docker), roda, derruba
+npm run test:integration:report:open  # abre o dashboard dos testes de integração (rodar test:integration antes)
 ```
 
 Banco local via `docker compose up -d` (PostgreSQL, variáveis lidas do `.env`). Rode `npm run lint` e `npm test` antes de abrir um PR.
+
+### Testes de integração
+
+`npm run test:integration` (via `scripts/rodar-testes-integracao.js`) sobe um Postgres descartável isolado (`docker-compose.test.yml`, porta 5433, `tmpfs`, sem volume — nunca toca no banco de desenvolvimento), roda `test/integration/**/*.integration-spec.ts` contra ele com `DB_SYNCHRONIZE=true`, e sempre derruba o container no final (mesmo se os testes falharem). Exige Docker rodando. Diferente dos testes unitários (tudo mockado), aqui só `CertificadoService`/`SefazClientService` são mockados (na borda do processo — nunca rede real) — banco, TypeORM, montagem e assinatura do XML são reais. É o único jeito de validar de verdade o lock pessimista de `numeracao_controle` sob concorrência real.
+
+Cada suíte de testes (unitária, integração) gera seu próprio dashboard HTML via `jest-html-reporters` (lista de casos + link para a cobertura), em `test-report/unit/` e `test-report/integration/` — ambos artefatos locais, fora do controle de versão.
 
 ## Arquitetura
 

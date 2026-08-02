@@ -1,0 +1,21 @@
+name: emissornf-test
+
+services:
+  postgres-test:
+    image: postgres:16-alpine
+    container_name: emissornf-postgres-test
+    restart: 'no'
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: emissornf_integration
+    ports:
+      - '5433:5432'
+    tmpfs:
+      # Sem volume nomeado de propósito: banco descartável, dados somem ao parar o container.
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres']
+      interval: 2s
+      timeout: 5s
+      retries: 20

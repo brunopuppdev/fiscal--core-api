@@ -1,0 +1,25 @@
+{
+  "moduleFileExtensions": ["js", "json", "ts"],
+  "rootDir": "..",
+  "testEnvironment": "node",
+  "testRegex": "test/integration/.*\\.integration-spec\\.ts$",
+  "transform": {
+    "^.+\\.(t|j)s$": "ts-jest"
+  },
+  "testTimeout": 30000,
+  "collectCoverageFrom": ["src/**/*.ts", "!src/**/*.spec.ts"],
+  "coverageDirectory": "coverage-integration",
+  "reporters": [
+    "default",
+    [
+      "jest-html-reporters",
+      {
+        "publicPath": "test-report/integration",
+        "filename": "index.html",
+        "pageTitle": "EmissorNF — Testes de integração",
+        "expand": true,
+        "coverageLink": "../../coverage-integration/lcov-report/index.html"
+      }
+    ]
+  ]
+}

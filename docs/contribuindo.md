@@ -24,9 +24,17 @@ npm run start:dev
 | `npm test` | Testes unitários (Jest) |
 | `npm run test:watch` | Testes unitários em modo watch |
 | `npm run test:cov` | Testes unitários com cobertura |
+| `npm run test:cov:open` | Testes unitários com cobertura + abre o relatório HTML |
+| `npm run test:report:open` | Testes unitários + abre o dashboard de casos (jest-html-reporters) |
 | `npm run test:e2e` | Testes end-to-end |
+| `npm run test:integration` | Testes de integração (Postgres descartável via Docker — veja abaixo) |
+| `npm run test:integration:report:open` | Abre o dashboard dos testes de integração |
 
 Rode `npm run lint` e `npm test` antes de abrir um PR.
+
+### Testes de integração
+
+Além dos testes unitários (tudo mockado), há testes de integração em `test/integration/`, que rodam contra um Postgres descartável real (não o de desenvolvimento): `npm run test:integration` sobe o container (`docker-compose.test.yml`, porta 5433), roda os testes com o schema sincronizado automaticamente, e derruba o container ao final — exige o Docker rodando. Use para validar mudanças que dependem de comportamento real do banco (ex.: o lock pessimista de `numeracao_controle`) ou o fluxo HTTP completo (request → validação → persistência → resposta), não só a lógica isolada.
 
 ## Convenções do projeto
 

@@ -4,8 +4,10 @@ node_modules/
 # build output
 dist/
 
-# cobertura de testes
+# cobertura de testes e dashboards de relatório
 coverage/
+coverage-integration/
+test-report/
 
 # env
 .env
