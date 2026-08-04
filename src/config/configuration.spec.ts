@@ -28,6 +28,8 @@ const CHAVES_ENV = [
   'EMITENTE_TELEFONE',
   'NFE_SERIE',
   'NFCE_SERIE',
+  'NFCE_CSC',
+  'NFCE_CSC_ID',
 ] as const;
 
 describe('configuration', () => {
@@ -92,6 +94,10 @@ describe('configuration', () => {
     it('usa série 1 como padrão para NF-e e NFC-e', () => {
       expect(configuration().numeracao).toEqual({ nfeSerie: 1, nfceSerie: 1 });
     });
+
+    it('usa strings vazias como padrão para CSC e CSC ID da NFC-e', () => {
+      expect(configuration().nfce).toEqual({ csc: '', cscId: '' });
+    });
   });
 
   describe('leitura e conversão de variáveis de ambiente informadas', () => {
@@ -152,6 +158,16 @@ describe('configuration', () => {
       expect(config.certificado.senha).toBe('segredo-fake');
     });
 
+    it('repassa CSC e CSC ID da NFC-e quando informados', () => {
+      process.env.NFCE_CSC = 'csc-fake-de-teste';
+      process.env.NFCE_CSC_ID = '3';
+
+      expect(configuration().nfce).toEqual({
+        csc: 'csc-fake-de-teste',
+        cscId: '3',
+      });
+    });
+
     it('repassa complemento e telefone do emitente quando informados', () => {
       process.env.EMITENTE_COMPLEMENTO = 'Sala 2';
       process.env.EMITENTE_TELEFONE = '11999999999';
@@ -173,6 +189,7 @@ describe('configuration', () => {
           'certificado',
           'emitente',
           'numeracao',
+          'nfce',
         ].sort(),
       );
     });

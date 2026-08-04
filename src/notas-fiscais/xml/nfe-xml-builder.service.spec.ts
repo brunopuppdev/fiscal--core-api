@@ -54,6 +54,9 @@ function dadosFixture(
     ambiente: 2,
     emitente: emitenteFixture,
     itens: [itemFixture()],
+    // Modelo padrão da fixture é NFCE, que exige CSC/CSC ID para montar o infNFeSupl.
+    csc: 'CSC-FIXTURE-DE-TESTE',
+    cscId: '1',
     ...overrides,
   };
 }
@@ -120,6 +123,10 @@ interface XmlDet {
   prod: XmlProd;
   imposto: { ICMS: Record<string, XmlIcmsSN> };
 }
+interface XmlInfNFeSupl {
+  qrCode: string;
+  urlChave: string;
+}
 interface XmlNfeDoc {
   NFe: {
     infNFe: {
@@ -130,6 +137,7 @@ interface XmlNfeDoc {
       det: XmlDet | XmlDet[];
       total: { ICMSTot: { vProd: string; vNF: string } };
     };
+    infNFeSupl?: XmlInfNFeSupl;
   };
 }
 
@@ -308,6 +316,56 @@ describe('NfeXmlBuilderService', () => {
     });
   });
 
+  describe('montar - QR Code da NFC-e (infNFeSupl)', () => {
+    it('monta infNFeSupl com qrCode (contendo o parâmetro p) e urlChave para NFC-e', () => {
+      const xml = service.montar(dadosFixture());
+      const doc = parseXml(xml);
+
+      expect(doc.NFe.infNFeSupl).toBeDefined();
+      expect(doc.NFe.infNFeSupl?.qrCode).toContain(
+        `?p=${CHAVE_ACESSO_FIXTURE}|2|`,
+      );
+      expect(doc.NFe.infNFeSupl?.urlChave).toMatch(/^https:\/\//);
+    });
+
+    it('posiciona infNFeSupl como elemento irmão de infNFe (fora dele), conforme schema', () => {
+      const xml = service.montar(dadosFixture());
+
+      expect(xml).toMatch(/<\/infNFe><infNFeSupl>/);
+    });
+
+    it('não monta infNFeSupl para NF-e (modelo 55)', () => {
+      const destinatario: DestinatarioDto = { documento: '98765432000188' };
+      const xml = service.montar(
+        dadosFixture({ modelo: ModeloDocumento.NFE, destinatario }),
+      );
+      const doc = parseXml(xml);
+
+      expect(doc.NFe.infNFeSupl).toBeUndefined();
+    });
+
+    it('lança Error quando NFC-e é montada sem CSC configurado', () => {
+      expect(() => service.montar(dadosFixture({ csc: undefined }))).toThrow(
+        /CSC e CSC ID são obrigatórios para NFC-e/,
+      );
+    });
+
+    it('lança Error quando NFC-e é montada sem CSC ID configurado', () => {
+      expect(() => service.montar(dadosFixture({ cscId: undefined }))).toThrow(
+        /CSC e CSC ID são obrigatórios para NFC-e/,
+      );
+    });
+
+    it('reflete o ambiente (tpAmb) no parâmetro p do QR Code', () => {
+      const xml = service.montar(dadosFixture({ ambiente: 1 }));
+      const doc = parseXml(xml);
+
+      expect(doc.NFe.infNFeSupl?.qrCode).toContain(
+        `${CHAVE_ACESSO_FIXTURE}|2|1|`,
+      );
+    });
+  });
+
   describe('montar - NF-e (modelo 55, com destinatário)', () => {
     it('monta o destinatário pessoa jurídica usando o elemento CNPJ', () => {
       const destinatario: DestinatarioDto = {
@@ -417,8 +475,13 @@ describe('NfeXmlBuilderService', () => {
     });
 
     it('usa cUF "35" quando a UF do emitente não está no mapa CODIGO_UF', () => {
+      // NF-e (modelo 55): evita acionar a busca de URLs de consulta de NFC-e, que exige
+      // a UF estar configurada em sefaz-endpoints.ts (não é o que este teste exercita).
+      const destinatario: DestinatarioDto = { documento: '98765432000188' };
       const xml = service.montar(
         dadosFixture({
+          modelo: ModeloDocumento.NFE,
+          destinatario,
           emitente: { ...emitenteFixture, uf: 'ZZ' },
         }),
       );

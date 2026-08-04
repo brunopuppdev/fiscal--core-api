@@ -41,6 +41,7 @@ export class NotasFiscaisService {
     const emitente = this.configService.get('emitente', { infer: true });
     const { ambiente } = this.configService.get('sefaz', { infer: true });
     const numeracao = this.configService.get('numeracao', { infer: true });
+    const { csc, cscId } = this.configService.get('nfce', { infer: true });
 
     if (dto.modelo === ModeloDocumento.NFE && !dto.destinatario?.documento) {
       throw new BadRequestException(
@@ -91,6 +92,8 @@ export class NotasFiscaisService {
       emitente,
       destinatario: dto.destinatario,
       itens: dto.itens,
+      csc,
+      cscId,
     });
 
     const xmlAssinado = this.xmlSigner.assinar(xml);

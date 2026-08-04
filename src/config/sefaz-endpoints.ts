@@ -111,3 +111,49 @@ export function getSefazEndpoints(
     modelo === ModeloDocumento.NFCE ? conjuntoUf.nfce : conjuntoUf.nfe;
   return ambiente === 1 ? conjuntoModelo.producao : conjuntoModelo.homologacao;
 }
+
+/**
+ * URLs públicas (não-SOAP) usadas no QR Code da NFC-e (grupo infNFeSupl, NT 2015.002):
+ * `qrCode` é a URL raiz para onde o parâmetro "p" é anexado (o que o consumidor escaneia);
+ * `urlChave` é a página de consulta manual pela chave de acesso (sem parâmetros).
+ * São páginas públicas do portal da NFC-e, diferentes dos webservices SOAP acima.
+ */
+export interface NfceConsultaUrls {
+  qrCode: string;
+  urlChave: string;
+}
+
+interface NfceConsultaUrlsPorAmbiente {
+  homologacao: NfceConsultaUrls;
+  producao: NfceConsultaUrls;
+}
+
+const SP_NFCE_CONSULTA: NfceConsultaUrlsPorAmbiente = {
+  homologacao: {
+    qrCode:
+      'https://www.homologacao.nfce.fazenda.sp.gov.br/NFCeConsultaPublica/Paginas/ConsultaQRCode.aspx',
+    urlChave: 'https://www.homologacao.nfce.fazenda.sp.gov.br/consulta',
+  },
+  producao: {
+    qrCode:
+      'https://www.nfce.fazenda.sp.gov.br/NFCeConsultaPublica/Paginas/ConsultaQRCode.aspx',
+    urlChave: 'https://www.nfce.fazenda.sp.gov.br/consulta',
+  },
+};
+
+const CONSULTA_NFCE_POR_UF: Record<string, NfceConsultaUrlsPorAmbiente> = {
+  SP: SP_NFCE_CONSULTA,
+};
+
+export function getNfceConsultaUrls(
+  uf: string,
+  ambiente: number,
+): NfceConsultaUrls {
+  const conjunto = CONSULTA_NFCE_POR_UF[uf.toUpperCase()];
+  if (!conjunto) {
+    throw new Error(
+      `URLs de consulta de NFC-e não configuradas para a UF "${uf}". Adicione em sefaz-endpoints.ts.`,
+    );
+  }
+  return ambiente === 1 ? conjunto.producao : conjunto.homologacao;
+}

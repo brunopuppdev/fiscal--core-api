@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { create } from 'xmlbuilder2';
 import { EmitenteConfig } from '../../config/configuration';
+import { getNfceConsultaUrls } from '../../config/sefaz-endpoints';
 import { ModeloDocumento } from '../../common/enums/modelo-documento.enum';
 import { AppLogger } from '../../common/logger/app-logger';
 import { CODIGO_UF } from '../../common/utils/chave-acesso.util';
@@ -8,6 +9,7 @@ import { formatarDataHoraNfe } from '../../common/utils/data-hora-nfe.util';
 import { calcularIdDest } from '../../common/utils/id-dest.util';
 import { DestinatarioDto } from '../dto/destinatario.dto';
 import { ItemNotaDto } from '../dto/item-nota.dto';
+import { montarUrlQrCodeNfce } from './qrcode-nfce.util';
 
 export interface DadosMontagemNfe {
   chaveAcesso: string;
@@ -21,6 +23,9 @@ export interface DadosMontagemNfe {
   emitente: EmitenteConfig;
   destinatario?: DestinatarioDto;
   itens: ItemNotaDto[];
+  /** CSC e CSC ID (credenciamento NFC-e na SEFAZ) — obrigatórios só quando modelo=NFCE. */
+  csc?: string;
+  cscId?: string;
 }
 
 const fmt = (valor: number, casas: number): string => valor.toFixed(casas);
@@ -233,6 +238,38 @@ export class NfeXmlBuilderService {
       .txt(
         'Documento emitido por Microempreendedor Individual (MEI) optante pelo Simples Nacional. Não gera direito a crédito fiscal de ICMS/IPI/PIS/COFINS.',
       );
+
+    // ---- infNFeSupl (QR Code, só NFC-e) ----
+    // Elemento irmão de infNFe (não filho) — schema exige a ordem infNFe, Signature,
+    // infNFeSupl. `doc` referencia infNFe, e `.up()` sobe para o nó NFe; como este
+    // builder roda antes da assinatura (NfeXmlSignerService insere <Signature> logo
+    // após </infNFe>), adicionar infNFeSupl aqui já deixa a ordem final correta.
+    if (isNfce) {
+      if (!dados.csc || !dados.cscId) {
+        const mensagem =
+          'CSC e CSC ID são obrigatórios para NFC-e (configure NFCE_CSC e NFCE_CSC_ID no .env).';
+        this.logger.warn(
+          `Falha ao montar XML [chave=${dados.chaveAcesso}]: ${mensagem}`,
+        );
+        throw new Error(mensagem);
+      }
+
+      const { qrCode: urlQrCode, urlChave } = getNfceConsultaUrls(
+        emitente.uf,
+        dados.ambiente,
+      );
+      const qrCode = montarUrlQrCodeNfce({
+        chaveAcesso: dados.chaveAcesso,
+        ambiente: dados.ambiente,
+        csc: dados.csc,
+        cscId: dados.cscId,
+        urlQrCode,
+      });
+
+      const infNFeSupl = doc.up().ele('infNFeSupl');
+      infNFeSupl.ele('qrCode').dat(qrCode);
+      infNFeSupl.ele('urlChave').txt(urlChave);
+    }
 
     // headless: true suprime a declaração <?xml ...?> — o XML da NFe nunca é usado como
     // documento de topo isolado, e sim embutido em outro elemento (<enviNFe> no envio à

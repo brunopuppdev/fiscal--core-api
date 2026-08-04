@@ -69,6 +69,25 @@ Se você chegou até aqui achando que dava para usar seu e-CPF com uma procuraç
 
 Só use certificados **A1** (arquivo `.pfx`) — a aplicação não suporta certificado A3 (token/smartcard).
 
+## QR Code da NFC-e (CSC)
+
+Toda NFC-e (modelo 65) autorizada precisa trazer um **QR Code** no XML (grupo `infNFeSupl`), usado pelo DANFCE (cupom) para o consumidor consultar a nota publicamente — é uma exigência de schema/regra de negócio da SEFAZ, não um recurso opcional deste projeto. `NfeXmlBuilderService` monta esse grupo automaticamente para NFC-e (não se aplica a NF-e, modelo 55).
+
+Isso depende de duas credenciais **diferentes do certificado digital**:
+
+- **CSC** (Código de Segurança do Contribuinte) — um segredo compartilhado só entre o emitente e a SEFAZ, usado para calcular um hash que comprova que o QR Code foi gerado por quem tem o CSC (não é assinatura digital, é um mecanismo mais simples, específico do QR Code).
+- **CSC ID** — o identificador desse CSC no cadastro da SEFAZ (cada contribuinte pode ter mais de um CSC cadastrado).
+
+**Como obter**: no [portal da NFC-e da SEFAZ-SP](https://www.nfce.fazenda.sp.gov.br/), em "Credenciamento" — é um cadastro específico para emissão de NFC-e, separado do credenciamento de certificado digital. **Homologação e produção têm CSC próprios e diferentes** — não use o CSC de homologação em produção nem vice-versa (o hash calculado com o CSC errado é rejeitado, mesmo que o resto do XML esteja correto).
+
+Configure no `.env`:
+```
+NFCE_CSC=seu-csc-aqui
+NFCE_CSC_ID=1
+```
+
+Sem essas variáveis preenchidas, a emissão de NFC-e falha com um erro explícito ao montar o XML (antes de qualquer tentativa de envio à SEFAZ) — a aplicação não tenta adivinhar ou omitir o QR Code silenciosamente.
+
 ## Antes de emitir notas reais
 
 1. **Confirme com um contador**: o NCM de cada produto, o CFOP correto para sua operação, e se CSOSN 102 é mesmo o adequado ao seu caso (pode variar conforme a atividade).

@@ -1,5 +1,5 @@
 import { ModeloDocumento } from '../common/enums/modelo-documento.enum';
-import { getSefazEndpoints } from './sefaz-endpoints';
+import { getNfceConsultaUrls, getSefazEndpoints } from './sefaz-endpoints';
 
 describe('getSefazEndpoints', () => {
   describe('SP - NF-e (modelo 55)', () => {
@@ -108,5 +108,40 @@ describe('getSefazEndpoints', () => {
         Error,
       );
     });
+  });
+});
+
+describe('getNfceConsultaUrls', () => {
+  it('retorna as URLs de homologação (qrCode e urlChave) quando ambiente=2', () => {
+    const urls = getNfceConsultaUrls('SP', 2);
+
+    expect(urls.qrCode).toBe(
+      'https://www.homologacao.nfce.fazenda.sp.gov.br/NFCeConsultaPublica/Paginas/ConsultaQRCode.aspx',
+    );
+    expect(urls.urlChave).toBe(
+      'https://www.homologacao.nfce.fazenda.sp.gov.br/consulta',
+    );
+  });
+
+  it('retorna as URLs de produção quando ambiente=1', () => {
+    const urls = getNfceConsultaUrls('SP', 1);
+
+    expect(urls.qrCode).toBe(
+      'https://www.nfce.fazenda.sp.gov.br/NFCeConsultaPublica/Paginas/ConsultaQRCode.aspx',
+    );
+    expect(urls.urlChave).toBe('https://www.nfce.fazenda.sp.gov.br/consulta');
+    expect(urls.qrCode).not.toContain('homologacao.');
+  });
+
+  it('aceita a UF em minúsculas (normaliza para maiúsculas internamente)', () => {
+    const urls = getNfceConsultaUrls('sp', 1);
+
+    expect(urls.qrCode).toContain('nfce.fazenda.sp.gov.br');
+  });
+
+  it('lança um erro claro para UF não configurada', () => {
+    expect(() => getNfceConsultaUrls('RJ', 2)).toThrow(
+      'URLs de consulta de NFC-e não configuradas para a UF "RJ". Adicione em sefaz-endpoints.ts.',
+    );
   });
 });

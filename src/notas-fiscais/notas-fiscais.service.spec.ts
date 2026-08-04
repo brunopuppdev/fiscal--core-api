@@ -151,6 +151,8 @@ describe('NotasFiscaisService', () => {
             return { ambiente: 2, uf: 'SP' };
           case 'numeracao':
             return { nfeSerie: 1, nfceSerie: 1 };
+          case 'nfce':
+            return { csc: 'CSC-FIXTURE', cscId: '1' };
           default:
             throw new Error(
               `Chave de configuração não mockada neste teste: ${chave}`,
@@ -239,6 +241,16 @@ describe('NotasFiscaisService', () => {
         ModeloDocumento.NFE,
       );
     });
+
+    it('repassa CSC e CSC ID (config nfce) para o builder do XML', async () => {
+      sefazClientMock.autorizar.mockResolvedValue(retornoAutorizada());
+
+      await service.emitir(dtoNfce());
+
+      expect(xmlBuilderMock.montar).toHaveBeenCalledWith(
+        expect.objectContaining({ csc: 'CSC-FIXTURE', cscId: '1' }),
+      );
+    });
   });
 
   describe('emitir - dados derivados com valores padrão/opcionais', () => {
@@ -252,6 +264,8 @@ describe('NotasFiscaisService', () => {
             return { ambiente: 2, uf: 'SP' };
           case 'numeracao':
             return { nfeSerie: 1, nfceSerie: 1 };
+          case 'nfce':
+            return { csc: 'CSC-FIXTURE', cscId: '1' };
           default:
             throw new Error(
               `Chave de configuração não mockada neste teste: ${chave}`,

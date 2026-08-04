@@ -48,7 +48,7 @@ src/
 2. **Reserva do número** — dentro de uma transação com `pessimistic_write` lock na tabela `numeracao_controle` (chave: modelo + série), garantindo numeração sequencial mesmo sob chamadas concorrentes.
 3. **Geração da chave de acesso** — `montarChaveAcesso` monta os 43 dígitos (UF, AAMM, CNPJ, modelo, série, número, tipo de emissão, código numérico aleatório) e calcula o dígito verificador via módulo 11.
 4. **Montagem do XML** — `NfeXmlBuilderService` gera o XML NFe 4.00 completo (`ide`, `emit`, `dest`, `det` por item, `total`, `transp`, `pag`, `infAdic`), assumindo o cenário padrão MEI/Simples Nacional (CSOSN informado por item, PIS/COFINS CST 49, CRT 4 — código
-   específico de MEI desde 01/04/2025, Ajuste SINIEF 43/2023).
+   específico de MEI desde 01/04/2025, Ajuste SINIEF 43/2023). Para NFC-e (modelo 65), monta também o grupo `infNFeSupl` (QR Code) — veja [Guia fiscal § QR Code da NFC-e](guia-fiscal.md#qr-code-da-nfc-e-csc).
 5. **Assinatura digital** — `NfeXmlSignerService` assina o elemento `<infNFe>` (enveloped signature, C14N, RSA-SHA1) usando a chave privada extraída do certificado `.pfx`.
 6. **Persistência inicial** — a nota é salva no banco com `status: ASSINADA` **antes** de tentar o envio à SEFAZ, para não perder o registro em caso de falha de rede.
 7. **Envio à SEFAZ** — `SefazClientService.autorizar` envia o XML assinado via SOAP (`NFeAutorizacao4`, lote síncrono `indSinc=1`). O retorno atualiza a nota:

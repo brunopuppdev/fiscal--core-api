@@ -38,6 +38,10 @@ export interface AppConfig {
     nfeSerie: number;
     nfceSerie: number;
   };
+  nfce: {
+    csc: string;
+    cscId: string;
+  };
 }
 
 export default (): AppConfig => ({
@@ -79,5 +83,11 @@ export default (): AppConfig => ({
   numeracao: {
     nfeSerie: parseInt(process.env.NFE_SERIE ?? '1', 10),
     nfceSerie: parseInt(process.env.NFCE_SERIE ?? '1', 10),
+  },
+  nfce: {
+    // Credenciamento específico para emissão de NFC-e no portal da SEFAZ-SP, distinto
+    // do certificado digital — necessário para montar o QR Code (grupo infNFeSupl).
+    csc: process.env.NFCE_CSC ?? '',
+    cscId: process.env.NFCE_CSC_ID ?? '',
   },
 });
