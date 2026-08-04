@@ -46,6 +46,7 @@ Toda chamada à SEFAZ usa **TLS mútuo**: o cliente apresenta o certificado do M
 | `100` | Autorizado o uso da NF-e | Nota válida — `xmlAutorizado` é montado com o protocolo embutido (`<nfeProc>`) |
 | `107` | Serviço em operação (retorno de `NFeStatusServico4`) | A SEFAZ está disponível |
 | `282` | Rejeição: Certificado Transmissor sem CNPJ | O certificado usado (provavelmente um e-CPF) não tem CNPJ embutido — só um e-CNPJ resolve, não há solução por procuração. Veja [Guia fiscal § Certificado digital](guia-fiscal.md#certificado-digital) |
+| `1115` | Rejeição: IBS/CBS não informado | Ver [§ Rejeição 1115 em homologação SP para MEI (CRT 4)](#rejeição-1115-ibscbs-em-homologação-sp-para-mei-crt-4) abaixo — aparentemente fora do cronograma oficial para MEI |
 | outros `1xx`/`2xx` de rejeição | Erro de preenchimento (NCM, CFOP, CSOSN, dados do destinatário, etc.) | Consulte o `xMotivo` retornado — geralmente autoexplicativo — e revise os dados enviados |
 
 A lista completa de códigos está no Manual de Orientação do Contribuinte (MOC) da NF-e, disponível no [portal nacional da NF-e](https://www.nfe.fazenda.gov.br).
@@ -60,7 +61,30 @@ Na tentativa de autorização (`NFeAutorizacao4`), a SEFAZ retornou:
 cStat 282 — Rejeição: Certificado Transmissor sem CNPJ
 ```
 
-Ou seja, o certificado usado no teste era um e-CPF (do titular do MEI), que não carrega CNPJ algum — e a SEFAZ valida exatamente esse campo do certificado, não um cadastro de procuração da Receita Federal. **Uma procuração eletrônica no e-CAC não resolve esse cenário**: ela concede acesso a serviços da Receita Federal, mas não insere um CNPJ no certificado nem afeta a validação feita pela SEFAZ na transmissão da NF-e. A única solução é usar um certificado **e-CNPJ** emitido para o CNPJ do MEI — veja o passo a passo em [Guia fiscal § Certificado digital](guia-fiscal.md#certificado-digital). Assim que o e-CNPJ estiver configurado, a expectativa é que a autorização funcione sem mudanças na aplicação — mas isso **ainda precisa ser confirmado** em um teste ponta a ponta com o certificado correto.
+Ou seja, o certificado usado no teste era um e-CPF (do titular do MEI), que não carrega CNPJ algum — e a SEFAZ valida exatamente esse campo do certificado, não um cadastro de procuração da Receita Federal. **Uma procuração eletrônica no e-CAC não resolve esse cenário**: ela concede acesso a serviços da Receita Federal, mas não insere um CNPJ no certificado nem afeta a validação feita pela SEFAZ na transmissão da NF-e. A única solução é usar um certificado **e-CNPJ** emitido para o CNPJ do MEI — veja o passo a passo em [Guia fiscal § Certificado digital](guia-fiscal.md#certificado-digital).
+
+**Atualização (04/08/2026):** com o e-CNPJ correto configurado, uma nova tentativa de autorização (NFC-e, homologação) passou pela validação do certificado sem problema — TLS, mTLS e assinatura XML-DSig aceitos pela SEFAZ. A rejeição mudou para `cStat 1115` (veja seção abaixo), não relacionada a certificado.
+
+### Rejeição 1115 (IBS/CBS) em homologação SP para MEI (CRT 4)
+
+Em 04/08/2026, uma tentativa de autorização de NFC-e (`EMITENTE_CRT=4`, confirmado no XML enviado) foi rejeitada pela SEFAZ-SP em homologação com:
+
+```
+cStat 1115 — Rejeição: IBS/CBS não informado [nItem: 1]
+```
+
+Isso é parte da Reforma Tributária (LC 214/2025), regulamentada pela **NT 2025.002** (versão vigente em 04/08/2026: v1.50). Segundo o texto oficial da própria NT:
+
+> "As orientações para CRT=1-Simples Nacional, CRT=2-Simples Nacional-Excesso de Sublimite, CRT=4-MEI e Tributação Monofásica serão publicadas em NT futura, tendo em vista que a tributação do IBS/CBS/IS para estes contribuintes ocorre somente a partir de 2027."
+
+E a regra de validação específica (grupo `UB13-30`, mensagem 1022/1115) traz, entre suas observações:
+
+> "Observação 1: implementação em homologação para NFe... e emitente com CRT 3=Regime Normal." (não cita CRT 4)
+> "Observação 3: implementação em produção para emitente com CRT... 4=Simples Nacional - MEI a partir 04/01/2027."
+
+Ou seja: **pela própria NT, um emitente CRT=4 (MEI) não deveria estar sujeito a essa rejeição nem em homologação nem em produção antes de 04/01/2027** — e a Receita ainda nem publicou os códigos (CST/`cClassTrib`) que o MEI deveria usar quando chegar a hora, porque a regra para esse regime ainda não existe. A rejeição recebida no ambiente de homologação da SEFAZ-SP parece estar fora desse cronograma nacional (possivelmente um efeito colateral do corte de produção do CRT 3, que aconteceu um dia antes, em 03/08/2026 — a própria NT observa que "implantação em homologação pode variar por UF").
+
+**Não há como corrigir isso no builder com confiança agora**: implementar o grupo `IBSCBS` com valores arbitrários trocaria essa rejeição por outra (CST inexistente, classificação incompatível, etc.), já que não existe ainda um valor oficialmente correto para o cenário MEI. Ação recomendada: reter este teste como bloqueado, e reavaliar quando a SEFAZ-SP corrigir o comportamento em homologação ou publicar a NT específica para CRT 1/2/4. Veja também [Roadmap](roadmap.md).
 
 ## Próximos passos
 
