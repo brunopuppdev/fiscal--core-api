@@ -61,9 +61,17 @@ export class NotasFiscaisController {
   @Get('status-sefaz')
   @ApiOperation({
     summary: 'Consulta o status do serviço da SEFAZ configurada',
+    description:
+      'NF-e e NFC-e usam webservices diferentes em SP; informe o modelo consultado.',
   })
-  statusSefaz() {
-    return this.notasFiscaisService.statusServicoSefaz();
+  @ApiQuery({
+    name: 'modelo',
+    enum: ModeloDocumento,
+    required: false,
+    description: 'Modelo consultado (padrão: 65, o mais comum em PDV/MEI)',
+  })
+  statusSefaz(@Query('modelo') modelo: ModeloDocumento = ModeloDocumento.NFCE) {
+    return this.notasFiscaisService.statusServicoSefaz(modelo);
   }
 
   @Get(':id')

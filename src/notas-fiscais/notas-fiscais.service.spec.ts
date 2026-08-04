@@ -236,6 +236,7 @@ describe('NotasFiscaisService', () => {
       expect(sefazClientMock.autorizar).toHaveBeenCalledWith(
         '<NFe>XML-ASSINADO-FIXTURE</NFe>',
         expect.any(Number),
+        ModeloDocumento.NFE,
       );
     });
   });
@@ -498,7 +499,7 @@ describe('NotasFiscaisService', () => {
   });
 
   describe('statusServicoSefaz', () => {
-    it('delega para SefazClientService.consultarStatusServico e retorna o resultado', async () => {
+    it('delega para SefazClientService.consultarStatusServico repassando o modelo e retorna o resultado', async () => {
       const statusMock = {
         cStat: '107',
         xMotivo: 'Serviço em Operação',
@@ -506,9 +507,11 @@ describe('NotasFiscaisService', () => {
       };
       sefazClientMock.consultarStatusServico.mockResolvedValue(statusMock);
 
-      const resultado = await service.statusServicoSefaz();
+      const resultado = await service.statusServicoSefaz(ModeloDocumento.NFCE);
 
-      expect(sefazClientMock.consultarStatusServico).toHaveBeenCalledTimes(1);
+      expect(sefazClientMock.consultarStatusServico).toHaveBeenCalledWith(
+        ModeloDocumento.NFCE,
+      );
       expect(resultado).toBe(statusMock);
     });
   });

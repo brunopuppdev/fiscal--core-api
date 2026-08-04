@@ -3,6 +3,7 @@ import { ServiceUnavailableException } from '@nestjs/common';
 import { AppConfig } from '../../config/configuration';
 import { CertificadoService } from '../../certificado/certificado.service';
 import { AppLogger } from '../../common/logger/app-logger';
+import { ModeloDocumento } from '../../common/enums/modelo-documento.enum';
 import { SefazClientService } from './sefaz-client.service';
 import { postSoap } from './soap-http.util';
 
@@ -213,7 +214,9 @@ describe('SefazClientService', () => {
         respostaStatusServico('107', 'Serviço em Operação'),
       );
 
-      const resultado = await service.consultarStatusServico();
+      const resultado = await service.consultarStatusServico(
+        ModeloDocumento.NFCE,
+      );
 
       expect(resultado.cStat).toBe('107');
       expect(resultado.emOperacao).toBe(true);
@@ -225,7 +228,9 @@ describe('SefazClientService', () => {
         respostaStatusServico('108', 'Serviço Paralisado Momentaneamente'),
       );
 
-      const resultado = await service.consultarStatusServico();
+      const resultado = await service.consultarStatusServico(
+        ModeloDocumento.NFCE,
+      );
 
       expect(resultado.cStat).toBe('108');
       expect(resultado.emOperacao).toBe(false);
@@ -234,20 +239,39 @@ describe('SefazClientService', () => {
     it('não faz nenhuma chamada de rede real: usa exclusivamente o postSoap mockado', async () => {
       postSoapMock.mockResolvedValue(respostaStatusServico('107', 'OK'));
 
-      await service.consultarStatusServico();
+      await service.consultarStatusServico(ModeloDocumento.NFCE);
 
       const [url] = postSoapMock.mock.calls[0];
       expect(typeof url).toBe('string');
       expect(postSoapMock).toHaveBeenCalledTimes(1);
     });
 
+    it('chama o domínio de NFC-e (nfce.fazenda.sp.gov.br) quando modelo=65', async () => {
+      postSoapMock.mockResolvedValue(respostaStatusServico('107', 'OK'));
+
+      await service.consultarStatusServico(ModeloDocumento.NFCE);
+
+      const [url] = postSoapMock.mock.calls[0];
+      expect(url).toContain('nfce.fazenda.sp.gov.br');
+    });
+
+    it('chama o domínio de NF-e (nfe.fazenda.sp.gov.br) quando modelo=55', async () => {
+      postSoapMock.mockResolvedValue(respostaStatusServico('107', 'OK'));
+
+      await service.consultarStatusServico(ModeloDocumento.NFE);
+
+      const [url] = postSoapMock.mock.calls[0];
+      expect(url).toContain('nfe.fazenda.sp.gov.br');
+      expect(url).not.toContain('nfce.fazenda.sp.gov.br');
+    });
+
     it('loga e relança o erro quando há falha de comunicação com a SEFAZ (promise rejeitada)', async () => {
       const erroComunicacao = new Error('socket hang up');
       postSoapMock.mockRejectedValue(erroComunicacao);
 
-      await expect(service.consultarStatusServico()).rejects.toThrow(
-        'socket hang up',
-      );
+      await expect(
+        service.consultarStatusServico(ModeloDocumento.NFCE),
+      ).rejects.toThrow('socket hang up');
       expect(errorSpy).toHaveBeenCalledWith(
         expect.stringContaining('Falha de comunicação com a SEFAZ'),
       );
@@ -256,15 +280,17 @@ describe('SefazClientService', () => {
     it('lança ServiceUnavailableException quando a resposta da SEFAZ não tem retConsStatServ (resposta malformada/inesperada)', async () => {
       postSoapMock.mockResolvedValue(envelopeSoap('<algoInesperado />'));
 
-      await expect(service.consultarStatusServico()).rejects.toThrow(
-        ServiceUnavailableException,
-      );
+      await expect(
+        service.consultarStatusServico(ModeloDocumento.NFCE),
+      ).rejects.toThrow(ServiceUnavailableException);
     });
 
     it('usa a string vazia padrão quando cStat vem como elemento não-escalar (com filhos) na resposta', async () => {
       postSoapMock.mockResolvedValue(respostaStatusServicoComCStatNaoEscalar());
 
-      const resultado = await service.consultarStatusServico();
+      const resultado = await service.consultarStatusServico(
+        ModeloDocumento.NFCE,
+      );
 
       expect(resultado.cStat).toBe('');
       expect(resultado.emOperacao).toBe(false);
@@ -273,7 +299,9 @@ describe('SefazClientService', () => {
     it('usa a string vazia padrão para xMotivo quando o elemento vem inteiramente ausente na resposta', async () => {
       postSoapMock.mockResolvedValue(respostaStatusServicoSemXMotivo('107'));
 
-      const resultado = await service.consultarStatusServico();
+      const resultado = await service.consultarStatusServico(
+        ModeloDocumento.NFCE,
+      );
 
       expect(resultado.cStat).toBe('107');
       expect(resultado.xMotivo).toBe('');
@@ -282,9 +310,9 @@ describe('SefazClientService', () => {
     it('lança ServiceUnavailableException quando retConsStatServ existe mas vem vazio (valor string, não objeto)', async () => {
       postSoapMock.mockResolvedValue(respostaStatusServicoComElementoVazio());
 
-      await expect(service.consultarStatusServico()).rejects.toThrow(
-        ServiceUnavailableException,
-      );
+      await expect(
+        service.consultarStatusServico(ModeloDocumento.NFCE),
+      ).rejects.toThrow(ServiceUnavailableException);
     });
 
     it('encontra retConsStatServ mesmo quando o elemento vem com prefixo de namespace (ex.: nfe:retConsStatServ)', async () => {
@@ -292,7 +320,9 @@ describe('SefazClientService', () => {
         respostaStatusServicoComPrefixoNamespace('107', 'Serviço em Operação'),
       );
 
-      const resultado = await service.consultarStatusServico();
+      const resultado = await service.consultarStatusServico(
+        ModeloDocumento.NFCE,
+      );
 
       expect(resultado.cStat).toBe('107');
       expect(resultado.emOperacao).toBe(true);
@@ -309,7 +339,11 @@ describe('SefazClientService', () => {
         ),
       );
 
-      const resultado = await service.autorizar('<NFe>...</NFe>', 1);
+      const resultado = await service.autorizar(
+        '<NFe>...</NFe>',
+        1,
+        ModeloDocumento.NFCE,
+      );
 
       expect(resultado.autorizada).toBe(true);
       expect(resultado.cStat).toBe('100');
@@ -328,7 +362,11 @@ describe('SefazClientService', () => {
         ),
       );
 
-      const resultado = await service.autorizar('<NFe>...</NFe>', 2);
+      const resultado = await service.autorizar(
+        '<NFe>...</NFe>',
+        2,
+        ModeloDocumento.NFCE,
+      );
 
       expect(resultado.autorizada).toBe(false);
       expect(resultado.cStat).toBe('225');
@@ -339,9 +377,9 @@ describe('SefazClientService', () => {
       const erroComunicacao = new Error('socket hang up');
       postSoapMock.mockRejectedValue(erroComunicacao);
 
-      await expect(service.autorizar('<NFe>...</NFe>', 3)).rejects.toThrow(
-        'socket hang up',
-      );
+      await expect(
+        service.autorizar('<NFe>...</NFe>', 3, ModeloDocumento.NFCE),
+      ).rejects.toThrow('socket hang up');
       expect(errorSpy).toHaveBeenCalledWith(
         expect.stringContaining('Falha de comunicação com a SEFAZ'),
       );
@@ -350,9 +388,9 @@ describe('SefazClientService', () => {
     it('lança ServiceUnavailableException quando a resposta da SEFAZ não tem o formato esperado', async () => {
       postSoapMock.mockResolvedValue(envelopeSoap('<algoInesperado />'));
 
-      await expect(service.autorizar('<NFe>...</NFe>', 4)).rejects.toThrow(
-        ServiceUnavailableException,
-      );
+      await expect(
+        service.autorizar('<NFe>...</NFe>', 4, ModeloDocumento.NFCE),
+      ).rejects.toThrow(ServiceUnavailableException);
     });
 
     it('retorna autorizada=false com cStat/xMotivo do nível superior quando o lote ainda não foi processado (sem infProt, ex. cStat 103)', async () => {
@@ -360,7 +398,11 @@ describe('SefazClientService', () => {
         respostaAutorizacaoSemInfProt('103', 'Lote recebido com sucesso'),
       );
 
-      const resultado = await service.autorizar('<NFe>...</NFe>', 5);
+      const resultado = await service.autorizar(
+        '<NFe>...</NFe>',
+        5,
+        ModeloDocumento.NFCE,
+      );
 
       expect(resultado.autorizada).toBe(false);
       expect(resultado.cStat).toBe('103');
@@ -380,7 +422,11 @@ describe('SefazClientService', () => {
         ),
       );
 
-      const resultado = await service.autorizar('<NFe>...</NFe>', 6);
+      const resultado = await service.autorizar(
+        '<NFe>...</NFe>',
+        6,
+        ModeloDocumento.NFCE,
+      );
 
       expect(resultado.autorizada).toBe(true);
       expect(resultado.protocolo).toBeUndefined();
@@ -399,7 +445,10 @@ describe('SefazClientService', () => {
         ),
       );
 
-      const resultado = await service.consultarProtocolo(chaveFicticia);
+      const resultado = await service.consultarProtocolo(
+        chaveFicticia,
+        ModeloDocumento.NFCE,
+      );
 
       expect(resultado.autorizada).toBe(true);
       expect(resultado.cStat).toBe('100');
@@ -415,7 +464,10 @@ describe('SefazClientService', () => {
         respostaConsultaProtocoloComInfProt('110', 'Uso Denegado', ''),
       );
 
-      const resultado = await service.consultarProtocolo(chaveFicticia);
+      const resultado = await service.consultarProtocolo(
+        chaveFicticia,
+        ModeloDocumento.NFCE,
+      );
 
       expect(resultado.autorizada).toBe(false);
       expect(resultado.cStat).toBe('110');
@@ -427,7 +479,10 @@ describe('SefazClientService', () => {
         respostaConsultaProtocoloSemInfProt('217', 'NF-e não consta na base'),
       );
 
-      const resultado = await service.consultarProtocolo(chaveFicticia);
+      const resultado = await service.consultarProtocolo(
+        chaveFicticia,
+        ModeloDocumento.NFCE,
+      );
 
       expect(resultado.autorizada).toBe(false);
       expect(resultado.cStat).toBe('217');
@@ -439,9 +494,9 @@ describe('SefazClientService', () => {
       const erroComunicacao = new Error('socket hang up');
       postSoapMock.mockRejectedValue(erroComunicacao);
 
-      await expect(service.consultarProtocolo(chaveFicticia)).rejects.toThrow(
-        'socket hang up',
-      );
+      await expect(
+        service.consultarProtocolo(chaveFicticia, ModeloDocumento.NFCE),
+      ).rejects.toThrow('socket hang up');
       expect(errorSpy).toHaveBeenCalledWith(
         expect.stringContaining('Falha de comunicação com a SEFAZ'),
       );
@@ -455,7 +510,10 @@ describe('SefazClientService', () => {
         ),
       );
 
-      const resultado = await service.consultarProtocolo(chaveFicticia);
+      const resultado = await service.consultarProtocolo(
+        chaveFicticia,
+        ModeloDocumento.NFCE,
+      );
 
       expect(resultado.autorizada).toBe(true);
       expect(resultado.protocolo).toBeUndefined();

@@ -63,7 +63,9 @@ export default (): AppConfig => ({
     razaoSocial: process.env.EMITENTE_RAZAO_SOCIAL ?? '',
     nomeFantasia: process.env.EMITENTE_NOME_FANTASIA ?? '',
     ie: process.env.EMITENTE_IE ?? 'ISENTO',
-    crt: parseInt(process.env.EMITENTE_CRT ?? '1', 10),
+    // CRT 4 = Simples Nacional - MEI, código específico para MEI desde 01/04/2025
+    // (Ajuste SINIEF 43/2023, NT 2024.001) — este projeto assume sempre emitente MEI.
+    crt: parseInt(process.env.EMITENTE_CRT ?? '4', 10),
     logradouro: process.env.EMITENTE_LOGRADOURO ?? '',
     numero: process.env.EMITENTE_NUMERO ?? '',
     complemento: process.env.EMITENTE_COMPLEMENTO,

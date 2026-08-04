@@ -83,7 +83,7 @@ interface XmlIde {
 interface XmlEmit {
   CNPJ: string;
   xNome: string;
-  IE: string;
+  IE?: string;
   CRT: string;
   enderEmit: { UF: string };
 }
@@ -107,6 +107,10 @@ interface XmlDest {
 }
 interface XmlProd {
   cProd: string;
+  xProd: string;
+  NCM: string;
+  CEST?: string;
+  CFOP: string;
 }
 interface XmlIcmsSN {
   CSOSN: string;
@@ -163,9 +167,30 @@ describe('NfeXmlBuilderService', () => {
 
       expect(emit.CNPJ).toBe('12345678000199');
       expect(emit.xNome).toBe('Empresa Teste MEI LTDA');
-      expect(emit.IE).toBe('ISENTO');
       expect(emit.CRT).toBe('1');
       expect(emit.enderEmit.UF).toBe('SP');
+    });
+
+    it('inclui a tag <IE> do emitente quando ele tem inscrição estadual', () => {
+      const xml = service.montar(
+        dadosFixture({ emitente: { ...emitenteFixture, ie: '110042490114' } }),
+      );
+      const doc = parseXml(xml);
+
+      expect(doc.NFe.infNFe.emit.IE).toBe('110042490114');
+    });
+
+    it('inclui a tag <IE> com o valor configurado mesmo quando é o literal "ISENTO"', () => {
+      // SEFAZ-SP rejeita (cStat 209) tanto a tag ausente (falha de schema) quanto o
+      // texto "ISENTO" (regra de negócio) — o emitente precisa ter uma IE numérica
+      // real cadastrada na SEFAZ. O builder não faz esse tratamento: só repassa o
+      // valor configurado, quem valida é a própria SEFAZ.
+      const xml = service.montar(
+        dadosFixture({ emitente: { ...emitenteFixture, ie: 'ISENTO' } }),
+      );
+      const doc = parseXml(xml);
+
+      expect(doc.NFe.infNFe.emit.IE).toBe('ISENTO');
     });
 
     it('não inclui o elemento dest quando não há destinatário informado', () => {
@@ -220,6 +245,50 @@ describe('NfeXmlBuilderService', () => {
       const icms = det.imposto.ICMS;
 
       expect(icms.ICMSSN102.CSOSN).toBe('102');
+    });
+
+    it('substitui a descrição do item 1 pelo texto fixo exigido em ambiente de homologação', () => {
+      const xml = service.montar(
+        dadosFixture({
+          ambiente: 2,
+          itens: [itemFixture({ descricao: 'Descrição real do produto' })],
+        }),
+      );
+      const doc = parseXml(xml);
+      const det = doc.NFe.infNFe.det as XmlDet;
+
+      expect(det.prod.xProd).toBe(
+        'NOTA FISCAL EMITIDA EM AMBIENTE DE HOMOLOGACAO - SEM VALOR FISCAL',
+      );
+    });
+
+    it('mantém a descrição informada nos itens seguintes ao item 1 em ambiente de homologação', () => {
+      const xml = service.montar(
+        dadosFixture({
+          ambiente: 2,
+          itens: [
+            itemFixture({ codigo: 'A', descricao: 'Item A' }),
+            itemFixture({ codigo: 'B', descricao: 'Item B' }),
+          ],
+        }),
+      );
+      const doc = parseXml(xml);
+      const det = doc.NFe.infNFe.det as XmlDet[];
+
+      expect(det[1].prod.xProd).toBe('Item B');
+    });
+
+    it('mantém a descrição original do item 1 em ambiente de produção', () => {
+      const xml = service.montar(
+        dadosFixture({
+          ambiente: 1,
+          itens: [itemFixture({ descricao: 'Descrição real do produto' })],
+        }),
+      );
+      const doc = parseXml(xml);
+      const det = doc.NFe.infNFe.det as XmlDet;
+
+      expect(det.prod.xProd).toBe('Descrição real do produto');
     });
 
     it('soma o valor dos itens (quantidade x valor unitário) em vProd e vNF do total', () => {
@@ -397,6 +466,34 @@ describe('NfeXmlBuilderService', () => {
       expect(enderDest.xMun).toBe('');
       expect(enderDest.UF).toBe(emitenteFixture.uf);
       expect(enderDest.CEP).toBe('');
+    });
+
+    it('inclui a tag <CEST> quando o item informa o campo', () => {
+      const xml = service.montar(
+        dadosFixture({ itens: [itemFixture({ cest: '1701000' })] }),
+      );
+      const doc = parseXml(xml);
+      const prod = (doc.NFe.infNFe.det as XmlDet).prod;
+
+      expect(prod.CEST).toBe('1701000');
+    });
+
+    it('não inclui a tag <CEST> quando o item não informa o campo', () => {
+      const xml = service.montar(dadosFixture());
+      const doc = parseXml(xml);
+      const prod = (doc.NFe.infNFe.det as XmlDet).prod;
+
+      expect(prod.CEST).toBeUndefined();
+    });
+
+    it('posiciona <CEST> entre <NCM> e <CFOP>, conforme exigido pelo schema da NF-e', () => {
+      const xml = service.montar(
+        dadosFixture({ itens: [itemFixture({ cest: '1701000' })] }),
+      );
+
+      expect(xml).toMatch(
+        /<NCM>20098990<\/NCM><CEST>1701000<\/CEST><CFOP>5102<\/CFOP>/,
+      );
     });
 
     it('usa "UN" como unidade do item (uCom/uTrib) quando o item não informa unidade', () => {

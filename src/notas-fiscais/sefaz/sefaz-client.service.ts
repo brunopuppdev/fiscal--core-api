@@ -5,6 +5,7 @@ import { AppConfig } from '../../config/configuration';
 import { getSefazEndpoints } from '../../config/sefaz-endpoints';
 import { CertificadoService } from '../../certificado/certificado.service';
 import { AppLogger } from '../../common/logger/app-logger';
+import { ModeloDocumento } from '../../common/enums/modelo-documento.enum';
 import { CODIGO_UF } from '../../common/utils/chave-acesso.util';
 import { montarEnvelopeSoap } from './soap-envelope.util';
 import { postSoap } from './soap-http.util';
@@ -67,13 +68,15 @@ export class SefazClientService {
     private readonly certificadoService: CertificadoService,
   ) {}
 
-  private endpoints() {
+  private endpoints(modelo: ModeloDocumento) {
     const { uf, ambiente } = this.configService.get('sefaz', { infer: true });
-    return { ...getSefazEndpoints(uf, ambiente), uf, ambiente };
+    return { ...getSefazEndpoints(uf, ambiente, modelo), uf, ambiente };
   }
 
-  async consultarStatusServico(): Promise<RetornoStatusServico> {
-    const { NFeStatusServico4, uf, ambiente } = this.endpoints();
+  async consultarStatusServico(
+    modelo: ModeloDocumento,
+  ): Promise<RetornoStatusServico> {
+    const { NFeStatusServico4, uf, ambiente } = this.endpoints(modelo);
     const cUF = CODIGO_UF[uf.toUpperCase()] ?? '35';
 
     const corpo =
@@ -132,8 +135,9 @@ export class SefazClientService {
   async autorizar(
     xmlNfeAssinado: string,
     idLote: number,
+    modelo: ModeloDocumento,
   ): Promise<RetornoAutorizacao> {
-    const { NFeAutorizacao4, uf, ambiente } = this.endpoints();
+    const { NFeAutorizacao4, uf, ambiente } = this.endpoints(modelo);
 
     const corpo =
       `<enviNFe versao="4.00" xmlns="http://www.portalfiscal.inf.br/nfe">` +
@@ -200,8 +204,11 @@ export class SefazClientService {
     };
   }
 
-  async consultarProtocolo(chaveAcesso: string): Promise<RetornoAutorizacao> {
-    const { NFeConsultaProtocolo4, uf, ambiente } = this.endpoints();
+  async consultarProtocolo(
+    chaveAcesso: string,
+    modelo: ModeloDocumento,
+  ): Promise<RetornoAutorizacao> {
+    const { NFeConsultaProtocolo4, uf, ambiente } = this.endpoints(modelo);
 
     const corpo =
       `<consSitNFe versao="4.00" xmlns="http://www.portalfiscal.inf.br/nfe">` +

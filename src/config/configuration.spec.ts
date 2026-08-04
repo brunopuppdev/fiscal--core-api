@@ -74,10 +74,10 @@ describe('configuration', () => {
       });
     });
 
-    it('usa IE=ISENTO, CRT=1 e UF=SP como padrão para o emitente, e strings vazias para os demais campos obrigatórios', () => {
+    it('usa IE=ISENTO, CRT=4 e UF=SP como padrão para o emitente, e strings vazias para os demais campos obrigatórios', () => {
       const { emitente } = configuration();
       expect(emitente.ie).toBe('ISENTO');
-      expect(emitente.crt).toBe(1);
+      expect(emitente.crt).toBe(4);
       expect(emitente.uf).toBe('SP');
       expect(emitente.cnpj).toBe('');
       expect(emitente.razaoSocial).toBe('');

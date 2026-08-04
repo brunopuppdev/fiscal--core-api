@@ -98,7 +98,7 @@ export class NfeXmlBuilderService {
     enderEmit.ele('xPais').txt('Brasil');
     if (emitente.telefone) enderEmit.ele('fone').txt(emitente.telefone);
     emit.ele('IE').txt(emitente.ie);
-    emit.ele('CRT').txt(String(emitente.crt)); // 1 = Simples Nacional (inclui MEI)
+    emit.ele('CRT').txt(String(emitente.crt)); // 4 = Simples Nacional - MEI (Ajuste SINIEF 43/2023, desde 01/04/2025)
 
     // ---- dest ----
     if (dados.destinatario?.documento || dados.destinatario?.nome) {
@@ -150,8 +150,18 @@ export class NfeXmlBuilderService {
       const prod = det.ele('prod');
       prod.ele('cProd').txt(item.codigo);
       prod.ele('cEAN').txt('SEM GTIN');
-      prod.ele('xProd').txt(item.descricao);
+      // Exigência do layout NF-e: em homologação (tpAmb=2) o item 1 precisa ter essa
+      // descrição fixa, para não confundir nota de teste com nota real (rejeição cStat 373).
+      const xProd =
+        dados.ambiente === 2 && nItem === 1
+          ? 'NOTA FISCAL EMITIDA EM AMBIENTE DE HOMOLOGACAO - SEM VALOR FISCAL'
+          : item.descricao;
+      prod.ele('xProd').txt(xProd);
       prod.ele('NCM').txt(item.ncm);
+      // CEST obrigatório quando o NCM está sujeito a regime de Substituição Tributária
+      // (Convênio ICMS 142/2018), independente de quem recolhe o ICMS-ST na operação
+      // (MEI não assume substituto tributário, mas o campo ainda é exigido no XML).
+      if (item.cest) prod.ele('CEST').txt(item.cest);
       prod.ele('CFOP').txt(item.cfop);
       prod.ele('uCom').txt(item.unidade ?? 'UN');
       prod.ele('qCom').txt(fmt(item.quantidade, 4));
@@ -224,6 +234,9 @@ export class NfeXmlBuilderService {
         'Documento emitido por Microempreendedor Individual (MEI) optante pelo Simples Nacional. Não gera direito a crédito fiscal de ICMS/IPI/PIS/COFINS.',
       );
 
-    return doc.end({ prettyPrint: false });
+    // headless: true suprime a declaração <?xml ...?> — o XML da NFe nunca é usado como
+    // documento de topo isolado, e sim embutido em outro elemento (<enviNFe> no envio à
+    // SEFAZ, <nfeProc> na persistência), onde uma declaração no meio do caminho é inválida.
+    return doc.end({ headless: true, prettyPrint: false });
   }
 }

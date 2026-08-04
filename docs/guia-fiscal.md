@@ -16,7 +16,11 @@ No código, isso é refletido em `CriarNotaFiscalDto.destinatario` (opcional, ma
 
 O builder de XML (`nfe-xml-builder.service.ts`) assume o cenário padrão de um MEI optante do Simples Nacional:
 
-- **CRT = 1** (Código de Regime Tributário — Simples Nacional, que inclui o MEI).
+- **CRT = 4** (Código de Regime Tributário — "Simples Nacional – Microempreendedor Individual – MEI"). Desde
+  01/04/2025 (Ajuste SINIEF 43/2023, regulamentado pela NT 2024.001), o MEI tem um código de CRT próprio,
+  distinto do CRT 1 ("Simples Nacional", usado por ME/EPP fora do MEI). Como este projeto é especificamente para
+  emissão como MEI (não é um ERP genérico para qualquer regime), o padrão assumido é sempre CRT = 4 — se o seu
+  caso não for MEI, confirme com o contador o CRT correto e ajuste `EMITENTE_CRT`.
 - **CSOSN por item** (Código de Situação da Operação no Simples Nacional) — o valor padrão usado é `102` ("tributada pelo Simples Nacional sem permissão de crédito"), mas é configurável por item (`ItemNotaDto.csosn`).
 - **PIS/COFINS CST 49** ("outras operações de saída"), sem valores destacados — padrão usual para quem está no Simples.
 - **Sem ICMS destacado** — coerente com o enquadramento MEI/Simples, que não destaca ICMS por fora do DAS.

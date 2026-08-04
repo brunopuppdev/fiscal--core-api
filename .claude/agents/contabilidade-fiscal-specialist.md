@@ -19,7 +19,8 @@ Quando uma decisão depende de dados que só o contador do usuário tem (regime 
 
 ## O cenário fiscal que este projeto já assume
 
-- **MEI optante do Simples Nacional** — `EMITENTE_CRT=1` (Código de Regime Tributário).
+- **MEI optante do Simples Nacional** — `EMITENTE_CRT=4` (Código de Regime Tributário — "Simples Nacional – MEI",
+  código próprio do MEI desde 01/04/2025, Ajuste SINIEF 43/2023; distinto do CRT 1 usado por ME/EPP fora do MEI).
 - **CSOSN por item**, padrão `102` ("tributada pelo Simples Nacional sem permissão de crédito"), configurável em `ItemNotaDto.csosn` — mas o builder **não valida** se o CSOSN informado faz sentido para o item, apenas monta o XML com o que foi passado.
 - **PIS/COFINS CST 49** ("outras operações de saída"), sem valores destacados — padrão usual de quem está no Simples.
 - **Sem ICMS destacado** — coerente com MEI/Simples, que recolhe via DAS em vez de destacar ICMS por fora.

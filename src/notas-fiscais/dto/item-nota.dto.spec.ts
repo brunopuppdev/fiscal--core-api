@@ -37,11 +37,34 @@ describe('ItemNotaDto', () => {
     expect(erros).toHaveLength(0);
   });
 
-  it('não gera erros quando os campos opcionais (unidade, csosn) são omitidos', async () => {
+  it('não gera erros quando os campos opcionais (unidade, csosn, cest) são omitidos', async () => {
     const erros = await validarPlano(
-      sem(itemValidoPlano(), 'unidade', 'csosn'),
+      sem(itemValidoPlano(), 'unidade', 'csosn', 'cest'),
     );
     expect(erros).toHaveLength(0);
+  });
+
+  it('não gera erros quando cest é informado com 7 dígitos', async () => {
+    const erros = await validarPlano({
+      ...itemValidoPlano(),
+      cest: '1701000',
+    });
+    expect(erros).toHaveLength(0);
+  });
+
+  it('rejeita cest com menos de 7 dígitos', async () => {
+    const erros = await validarPlano({ ...itemValidoPlano(), cest: '123' });
+    const erroCest = erros.find((e) => e.property === 'cest');
+    expect(erroCest).toBeDefined();
+    expect(erroCest?.constraints).toHaveProperty('matches');
+  });
+
+  it('rejeita cest com caracteres não numéricos', async () => {
+    const erros = await validarPlano({
+      ...itemValidoPlano(),
+      cest: 'ABCDEFG',
+    });
+    expect(erros.some((e) => e.property === 'cest')).toBe(true);
   });
 
   it('rejeita quando codigo está ausente', async () => {

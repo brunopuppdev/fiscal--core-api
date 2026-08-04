@@ -29,6 +29,17 @@ export class ItemNotaDto {
   @Matches(/^\d{8}$/, { message: 'ncm deve ter 8 dígitos' })
   ncm: string;
 
+  @ApiPropertyOptional({
+    example: '1701000',
+    description:
+      'CEST (7 dígitos, sem pontuação). Obrigatório quando o NCM está sujeito a ' +
+      'Substituição Tributária (Convênio ICMS 142/2018) — confirme com o contador.',
+  })
+  @IsOptional()
+  @IsString()
+  @Matches(/^\d{7}$/, { message: 'cest deve ter 7 dígitos' })
+  cest?: string;
+
   @ApiProperty({
     example: '5102',
     description:

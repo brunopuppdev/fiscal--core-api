@@ -114,6 +114,14 @@ Lista o histórico de notas emitidas, com filtros e paginação.
 
 Consulta o status do webservice `NFeStatusServico4` da SEFAZ configurada (UF + ambiente do `.env`). Útil para verificar se o serviço da Receita está operante antes de tentar emitir.
 
+Em SP, NF-e (modelo 55) e NFC-e (modelo 65) usam domínios de webservice diferentes — por isso este endpoint aceita um `modelo` para escolher qual conjunto de endpoints consultar.
+
+### Query params
+
+| Parâmetro | Tipo | Descrição |
+|---|---|---|
+| `modelo` | `"55"` \| `"65"` | Modelo consultado (padrão `"65"`, o mais comum em PDV/MEI) |
+
 ### Resposta
 
 ```json

@@ -93,7 +93,7 @@ Aplicação Nest single-process, sem fila/worker — `POST /notas-fiscais` só r
 1. **Validação** — `ValidationPipe` global (`whitelist`, `forbidNonWhitelisted`); o service rejeita NF-e (modelo 55) sem `destinatario.documento` (NFC-e pode ser sem destinatário identificado).
 2. **Reserva de número** — transação com `pessimistic_write` na tabela `numeracao_controle` (chave: modelo + série) para numeração sequencial sob concorrência.
 3. **Chave de acesso** — `common/utils/chave-acesso.util.ts` monta os 43 dígitos + dígito verificador (módulo 11).
-4. **Montagem do XML** — `notas-fiscais/xml/nfe-xml-builder.service.ts` gera o NFe 4.00 completo, assumindo o cenário padrão MEI/Simples Nacional (CRT 1, CSOSN 102 por item, PIS/COFINS CST 49, sem ICMS destacado).
+4. **Montagem do XML** — `notas-fiscais/xml/nfe-xml-builder.service.ts` gera o NFe 4.00 completo, assumindo o cenário padrão MEI/Simples Nacional (CRT 4, código específico de MEI desde 01/04/2025 — Ajuste SINIEF 43/2023 —, CSOSN 102 por item, PIS/COFINS CST 49, sem ICMS destacado).
 5. **Assinatura** — `notas-fiscais/xml/nfe-xml-signer.service.ts` assina `<infNFe>` (enveloped signature, C14N, RSA-SHA1 — exigência do layout da NF-e, não escolha do projeto) com a chave extraída do `.pfx`.
 6. **Persistência antes do envio** — a nota é salva com `status: ASSINADA` **antes** de chamar a SEFAZ, para não perder o registro em caso de falha de rede.
 7. **Envio à SEFAZ** — `notas-fiscais/sefaz/sefaz-client.service.ts` (`autorizar`) envia via SOAP `NFeAutorizacao4`, sempre lote síncrono (`indSinc=1`). `cStat 100` → `AUTORIZADA` (XML final vira `<nfeProc>`); outra rejeição → `REJEITADA`; erro de comunicação → `ERRO` com mensagem truncada em `motivoStatus`.

@@ -147,6 +147,7 @@ export class NotasFiscaisService {
       const retorno = await this.sefazClient.autorizar(
         xmlAssinado,
         nota.numero,
+        dto.modelo,
       );
 
       nota.codigoStatus = retorno.cStat;
@@ -215,8 +216,8 @@ export class NotasFiscaisService {
     return nota;
   }
 
-  async statusServicoSefaz() {
-    return this.sefazClient.consultarStatusServico();
+  async statusServicoSefaz(modelo: ModeloDocumento) {
+    return this.sefazClient.consultarStatusServico(modelo);
   }
 
   private async proximoNumero(

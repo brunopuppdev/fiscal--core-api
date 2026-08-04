@@ -136,7 +136,7 @@ describe('NotasFiscaisController', () => {
   });
 
   describe('statusSefaz (GET /notas-fiscais/status-sefaz)', () => {
-    it('delega para NotasFiscaisService.statusServicoSefaz', async () => {
+    it('delega para NotasFiscaisService.statusServicoSefaz usando NFC-e (65) como padrão quando modelo não é informado', async () => {
       const statusMock = {
         cStat: '107',
         xMotivo: 'Em Operação',
@@ -146,8 +146,25 @@ describe('NotasFiscaisController', () => {
 
       const resultado = await controller.statusSefaz();
 
-      expect(serviceMock.statusServicoSefaz).toHaveBeenCalledTimes(1);
+      expect(serviceMock.statusServicoSefaz).toHaveBeenCalledWith(
+        ModeloDocumento.NFCE,
+      );
       expect(resultado).toBe(statusMock);
+    });
+
+    it('repassa o modelo informado explicitamente na query', async () => {
+      const statusMock = {
+        cStat: '107',
+        xMotivo: 'Em Operação',
+        emOperacao: true,
+      };
+      serviceMock.statusServicoSefaz.mockResolvedValue(statusMock);
+
+      await controller.statusSefaz(ModeloDocumento.NFE);
+
+      expect(serviceMock.statusServicoSefaz).toHaveBeenCalledWith(
+        ModeloDocumento.NFE,
+      );
     });
   });
 
