@@ -37,10 +37,14 @@ export class NfeXmlSignerService {
     });
 
     try {
+      // Insere <Signature> como último filho de <NFe> (não logo após infNFe): o schema
+      // oficial da NFe exige a ordem infNFe → infNFeSupl → Signature — como infNFeSupl
+      // (QR Code da NFC-e) já foi anexado ao NFe pelo builder antes da assinatura,
+      // "append" garante a ordem certa nos dois casos (com ou sem infNFeSupl).
       sig.computeSignature(xml, {
         location: {
-          reference: `//*[local-name(.)='infNFe']`,
-          action: 'after',
+          reference: `//*[local-name(.)='NFe']`,
+          action: 'append',
         },
       });
     } catch (error) {

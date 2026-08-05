@@ -46,6 +46,7 @@ Toda chamada à SEFAZ usa **TLS mútuo**: o cliente apresenta o certificado do M
 | `100` | Autorizado o uso da NF-e | Nota válida — `xmlAutorizado` é montado com o protocolo embutido (`<nfeProc>`) |
 | `107` | Serviço em operação (retorno de `NFeStatusServico4`) | A SEFAZ está disponível |
 | `282` | Rejeição: Certificado Transmissor sem CNPJ | O certificado usado (provavelmente um e-CPF) não tem CNPJ embutido — só um e-CNPJ resolve, não há solução por procuração. Veja [Guia fiscal § Certificado digital](guia-fiscal.md#certificado-digital) |
+| `225` | Rejeição: Falha no Schema XML do lote de NFe | Genérico, sem detalhe do elemento — veja [§ QR Code da NFC-e: bug real de ordem de elementos](#qr-code-da-nfc-e-bug-real-de-ordem-de-elementos-corrigido) abaixo; causa real encontrada validando contra o XSD oficial, não só por tentativa e erro |
 | `1115` | Rejeição: IBS/CBS não informado | Ver [§ Rejeição 1115 em homologação SP para MEI (CRT 4)](#rejeição-1115-ibscbs-em-homologação-sp-para-mei-crt-4) abaixo — aparentemente fora do cronograma oficial para MEI |
 | outros `1xx`/`2xx` de rejeição | Erro de preenchimento (NCM, CFOP, CSOSN, dados do destinatário, etc.) | Consulte o `xMotivo` retornado — geralmente autoexplicativo — e revise os dados enviados |
 
@@ -85,6 +86,18 @@ E a regra de validação específica (grupo `UB13-30`, mensagem 1022/1115) traz,
 Ou seja: **pela própria NT, um emitente CRT=4 (MEI) não deveria estar sujeito a essa rejeição nem em homologação nem em produção antes de 04/01/2027** — e a Receita ainda nem publicou os códigos (CST/`cClassTrib`) que o MEI deveria usar quando chegar a hora, porque a regra para esse regime ainda não existe. A rejeição recebida no ambiente de homologação da SEFAZ-SP parece estar fora desse cronograma nacional (possivelmente um efeito colateral do corte de produção do CRT 3, que aconteceu um dia antes, em 03/08/2026 — a própria NT observa que "implantação em homologação pode variar por UF").
 
 **Não há como corrigir isso no builder com confiança agora**: implementar o grupo `IBSCBS` com valores arbitrários trocaria essa rejeição por outra (CST inexistente, classificação incompatível, etc.), já que não existe ainda um valor oficialmente correto para o cenário MEI. Ação recomendada: reter este teste como bloqueado, e reavaliar quando a SEFAZ-SP corrigir o comportamento em homologação ou publicar a NT específica para CRT 1/2/4. Veja também [Roadmap](roadmap.md).
+
+### QR Code da NFC-e: bug real de ordem de elementos (corrigido)
+
+Em 05/08/2026, com `NFCE_CSC`/`NFCE_CSC_ID` de homologação configurados, o primeiro teste de autorização de NFC-e com o grupo `infNFeSupl` (QR Code) foi rejeitado com:
+
+```
+cStat 225 — Rejeição: Falha no Schema XML do lote de NFe
+```
+
+Sem detalhe adicional na resposta da SEFAZ. A causa foi encontrada baixando o XSD oficial (`leiauteNFe_v4.00.xsd`) e inspecionando a sequência do `complexType TNFe`: a ordem exigida é **`infNFe` → `infNFeSupl` → `Signature`** — não `infNFe` → `Signature` → `infNFeSupl`, que era o que `NfeXmlSignerService` produzia (a assinatura era inserida imediatamente após `infNFe`, empurrando `infNFeSupl` para depois da assinatura).
+
+Corrigido trocando a inserção da assinatura de "logo após `infNFe`" para "como último filho de `NFe`" (`location: { reference: NFe, action: 'append' }` no `xml-crypto`) — isso mantém o comportamento correto para NF-e (sem `infNFeSupl`, `Signature` continua vindo logo após `infNFe`) e corrige a ordem para NFC-e. Testado contra a SEFAZ-SP real após a correção: a nota voltou a passar pelo schema e chegar à validação de regra de negócio (rejeição 1115 acima, não relacionada). Regressão coberta em `nfe-xml-signer.service.spec.ts`.
 
 ## Próximos passos
 

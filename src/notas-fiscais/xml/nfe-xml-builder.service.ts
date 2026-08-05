@@ -266,8 +266,12 @@ export class NfeXmlBuilderService {
         urlQrCode,
       });
 
+      // Texto puro (sem CDATA): a URL não tem caractere reservado de XML (&, <, >) que
+      // exija escaping, e o CDATA aqui já causou rejeição cStat 225 (Falha no Schema
+      // XML) em teste real contra a SEFAZ-SP homologação — o validador deles não pareceu
+      // lidar bem com a seção CDATA, mesmo sendo lexicamente equivalente a texto puro.
       const infNFeSupl = doc.up().ele('infNFeSupl');
-      infNFeSupl.ele('qrCode').dat(qrCode);
+      infNFeSupl.ele('qrCode').txt(qrCode);
       infNFeSupl.ele('urlChave').txt(urlChave);
     }
 

@@ -42,6 +42,19 @@ function xmlNfeFixture(): string {
   );
 }
 
+// Como o builder monta para NFC-e: infNFeSupl (QR Code) já presente como irmão de
+// infNFe, antes da assinatura.
+function xmlNfeFixtureComInfNFeSupl(): string {
+  return (
+    '<NFe xmlns="http://www.portalfiscal.inf.br/nfe">' +
+    `<infNFe versao="4.00" Id="NFe${CHAVE_ACESSO_FIXTURE}">` +
+    '<ide><cUF>35</cUF></ide>' +
+    '</infNFe>' +
+    '<infNFeSupl><qrCode>https://exemplo/qrcode?p=1</qrCode><urlChave>https://exemplo/consulta</urlChave></infNFeSupl>' +
+    '</NFe>'
+  );
+}
+
 describe('NfeXmlSignerService', () => {
   let certificadoTeste: { chavePrivadaPem: string; certificadoPem: string };
   let certificadoServiceMock: { obter: jest.Mock };
@@ -100,6 +113,24 @@ describe('NfeXmlSignerService', () => {
 
     expect(xmlAssinado).toContain(`Id="NFe${CHAVE_ACESSO_FIXTURE}"`);
     expect(xmlAssinado).toContain('<cUF>35</cUF>');
+  });
+
+  it('posiciona Signature logo após infNFe quando não há infNFeSupl (NF-e)', () => {
+    const xmlAssinado = service.assinar(xmlNfeFixture());
+
+    expect(xmlAssinado).toMatch(/<\/infNFe><Signature /);
+  });
+
+  it('posiciona Signature depois de infNFeSupl, não entre infNFe e infNFeSupl (NFC-e)', () => {
+    // Ordem exigida pelo schema oficial da NFe (TNFe): infNFe, infNFeSupl, Signature —
+    // já causou rejeição real da SEFAZ-SP (cStat 225, Falha no Schema XML) quando a
+    // assinatura era inserida logo após infNFe, empurrando infNFeSupl para o final.
+    const xmlAssinado = service.assinar(xmlNfeFixtureComInfNFeSupl());
+
+    expect(xmlAssinado).toMatch(/<\/infNFeSupl><Signature /);
+    expect(xmlAssinado.indexOf('<infNFeSupl>')).toBeLessThan(
+      xmlAssinado.indexOf('<Signature '),
+    );
   });
 
   it('loga e relança o erro quando a assinatura falha (ex.: chave privada inválida)', () => {
