@@ -87,6 +87,8 @@ Ou seja: **pela própria NT, um emitente CRT=4 (MEI) não deveria estar sujeito 
 
 **Não há como corrigir isso no builder com confiança agora**: implementar o grupo `IBSCBS` com valores arbitrários trocaria essa rejeição por outra (CST inexistente, classificação incompatível, etc.), já que não existe ainda um valor oficialmente correto para o cenário MEI. Ação recomendada: reter este teste como bloqueado, e reavaliar quando a SEFAZ-SP corrigir o comportamento em homologação ou publicar a NT específica para CRT 1/2/4. Veja também [Roadmap](roadmap.md).
 
+**Confirmado que é específico de homologação**: o teste em produção (abaixo) não sofreu essa rejeição, então o `cStat 1115` em homologação parece ser mesmo um comportamento fora do cronograma nacional, isolado ao ambiente de homologação da SEFAZ-SP.
+
 ### QR Code da NFC-e: bug real de ordem de elementos (corrigido)
 
 Em 05/08/2026, com `NFCE_CSC`/`NFCE_CSC_ID` de homologação configurados, o primeiro teste de autorização de NFC-e com o grupo `infNFeSupl` (QR Code) foi rejeitado com:
@@ -98,6 +100,18 @@ cStat 225 — Rejeição: Falha no Schema XML do lote de NFe
 Sem detalhe adicional na resposta da SEFAZ. A causa foi encontrada baixando o XSD oficial (`leiauteNFe_v4.00.xsd`) e inspecionando a sequência do `complexType TNFe`: a ordem exigida é **`infNFe` → `infNFeSupl` → `Signature`** — não `infNFe` → `Signature` → `infNFeSupl`, que era o que `NfeXmlSignerService` produzia (a assinatura era inserida imediatamente após `infNFe`, empurrando `infNFeSupl` para depois da assinatura).
 
 Corrigido trocando a inserção da assinatura de "logo após `infNFe`" para "como último filho de `NFe`" (`location: { reference: NFe, action: 'append' }` no `xml-crypto`) — isso mantém o comportamento correto para NF-e (sem `infNFeSupl`, `Signature` continua vindo logo após `infNFe`) e corrige a ordem para NFC-e. Testado contra a SEFAZ-SP real após a correção: a nota voltou a passar pelo schema e chegar à validação de regra de negócio (rejeição 1115 acima, não relacionada). Regressão coberta em `nfe-xml-signer.service.spec.ts`.
+
+### Emissão real autorizada em produção (05/08/2026)
+
+Com a correção do QR Code aplicada, uma NFC-e foi emitida em **produção** (`SEFAZ_AMBIENTE=1`, CSC de produção) e **autorizada pela SEFAZ-SP**:
+
+```
+cStat 100 — Autorizado o uso da NF-e
+chave de acesso: 35260866963234000142650010000000191495501334
+protocolo: 135265292865225
+```
+
+Isso valida o fluxo completo ponta a ponta contra o ambiente real: certificado e-CNPJ, mTLS, assinatura XML-DSig, QR Code (`infNFeSupl`), schema e regra de negócio — tudo aceito pela SEFAZ. Note que essa mesma emissão **não** sofreu a rejeição `cStat 1115` (IBS/CBS) descrita acima, reforçando que aquele bloqueio é específico do ambiente de homologação.
 
 ## Próximos passos
 
