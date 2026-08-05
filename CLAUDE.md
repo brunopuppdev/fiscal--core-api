@@ -20,6 +20,7 @@ Este repositório define subagentes em `.claude/agents/` para as áreas de maior
 | `security-crypto-specialist` | Certificado digital (`.pfx`), mTLS, assinatura XML-DSig, tratamento de segredos (senha do certificado, chave privada, CNPJ/CPF). |
 | `testing-specialist` | Escrever/revisar testes unitários e e2e (Jest), incluindo como mockar certificado, banco e respostas SOAP da SEFAZ. |
 | `logging-specialist` | Desenhar e implementar logging — o que logar em cada camada, nível, correlação entre logs de uma mesma emissão, o que nunca logar. |
+| `architecture-specialist` | Decisões estruturais entre módulos — onde uma feature nova deve morar, quando a complexidade acumulada justifica reorganizar algo, e quando limitações atuais (single-process, `DB_SYNCHRONIZE=true`, uma instância por CNPJ) precisam mudar por carga real. Também mantém `docs/arquitetura.md`/`docs/roadmap.md` coerentes. |
 
 Cada agente tem seu próprio arquivo com o detalhamento das convenções específicas daquele domínio — leia o arquivo correspondente antes de delegar uma tarefa complexa.
 
