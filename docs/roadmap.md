@@ -12,7 +12,6 @@ Este projeto cobre o caminho principal de emissão de NF-e/NFC-e para um MEI, ma
 - **Emissão real validada ponta a ponta em produção** — em 05/08/2026, uma NFC-e foi autorizada pela SEFAZ-SP real (`cStat 100`, protocolo obtido, nota persistida com `status: AUTORIZADA`). Certificado e-CNPJ, assinatura XML-DSig, QR Code (`infNFeSupl`) e schema todos confirmados corretos contra o ambiente de produção. Veja [Integração com a SEFAZ § Status real de teste](integracao-sefaz.md#status-real-de-teste-homologação-sefaz-sp).
 - **Bloqueado só em homologação: rejeição `cStat 1115` (IBS/CBS) aplicada a emitente MEI (CRT 4)**, quando a NT 2025.002 (Reforma Tributária) diz explicitamente que essa regra só vale para CRT=4 a partir de 04/01/2027 — e os códigos corretos para MEI ainda nem foram publicados pela Receita. A emissão real em produção (acima) não foi afetada por essa rejeição, então parece ser um comportamento específico do ambiente de homologação da SEFAZ-SP, não um bloqueio geral. Não há como implementar uma correção no builder com confiança até a SEFAZ-SP ajustar o comportamento em homologação ou a NT específica de CRT 1/2/4 ser publicada.
 - **Uma instância = um CNPJ.** Não há suporte a múltiplos emitentes na mesma aplicação.
-- **`DB_SYNCHRONIZE=true` continua sendo o padrão em desenvolvimento** — a baseline de migrations do TypeORM já existe (`src/migrations/1785947704056-Baseline.ts`, gerada a partir do schema atual das 3 entidades, com `src/config/typeorm.datasource.ts` e os scripts `migration:generate`/`migration:run`/`migration:revert` dando suporte à CLI), então isso deixou de ser "zero migrations". O que falta é decidir **quando** desligar `synchronize` por padrão e passar a rodar `migration:run` como parte do fluxo — `app.module.ts` e `test:integration` ainda não foram alterados, e continuam sincronizando o schema diretamente. Essa decisão segue sendo o item de maior urgência relativa deste roadmap: diferente das demais limitações (que dependem de carga real ou de definição regulatória para justificar mudança), o custo de adiar cresce com o tempo — uma vez que existam dados reais em produção ou mais de um ambiente/desenvolvedor sincronizando o schema, qualquer alteração futura de schema via `synchronize` passa a arriscar dado real. Como já houve uma emissão real autorizada em produção (05/08/2026, `cStat 100` — ver item acima), essa condição já não é hipotética.
 
 ## Ideias de evolução
 
@@ -23,7 +22,6 @@ Nenhuma promessa de prazo — é uma lista de possibilidades para quem quiser co
 - Geração de DANFE (NF-e) e DANFCE (NFC-e) em PDF.
 - Suporte a outras UFs (começando pelo ambiente SVRS compartilhado).
 - Endpoint HTTP para `NFeConsultaProtocolo4`.
-- Desligar `DB_SYNCHRONIZE=true` por padrão e adotar `migration:run` no fluxo de subida da aplicação (a baseline de migrations já existe, veja limitação acima — falta migrar o fluxo de desenvolvimento/deploy para usá-la em vez de `synchronize`).
 - Suporte a certificado A3 (token/smartcard), hoje só A1 (`.pfx`) é suportado.
 
 ## Como contribuir com o roadmap

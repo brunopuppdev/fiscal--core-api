@@ -73,7 +73,7 @@ Um-para-muitos com `notas_fiscais` (`ON DELETE CASCADE`, carregamento `eager`). 
 
 Uma linha por combinação `modelo` + `serie`, com o último número emitido (`ultimo_numero`). É a única tabela usada com lock pessimista, para evitar números duplicados ou pulados sob concorrência.
 
-Em desenvolvimento, o schema é criado automaticamente pelo TypeORM (`DB_SYNCHRONIZE=true`). Já existe uma baseline de migrations versionadas (`src/migrations/`, gerada via `src/config/typeorm.datasource.ts` e os scripts `migration:generate`/`migration:run`/`migration:revert` do `package.json`), mas o bootstrap da aplicação e o `test:integration` ainda usam `synchronize`, não `migration:run` — decidir quando desligar `synchronize` por padrão segue em aberto (veja [Roadmap](roadmap.md)).
+O schema é versionado por migrations do TypeORM (`src/migrations/`, geradas/aplicadas via `src/config/typeorm.datasource.ts` e os scripts `migration:generate`/`migration:run`/`migration:revert` do `package.json`); `DB_SYNCHRONIZE=false` é o padrão em `.env`/`.env.example`, e mudanças de schema devem passar por `migration:generate`/`migration:run`. Os testes de integração (`test:integration`) continuam intencionalmente com `synchronize=true` no Postgres descartável subido por `docker-compose.test.yml` — não é um banco persistente, então recriar o schema a cada execução é adequado ali.
 
 ## Certificado digital e mTLS
 
