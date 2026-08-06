@@ -276,6 +276,13 @@ export class DanfePdfService {
         `Forma de pagamento: ${textoFormaPagamento(nota.formaPagamento)}`,
       { width: LARGURA_UTIL },
     );
+    if (parseFloat(nota.troco) > 0) {
+      const valorPago = parseFloat(nota.valorTotal) + parseFloat(nota.troco);
+      doc.text(
+        `Valor pago: ${formatarMoeda(valorPago)}    Troco: ${formatarMoeda(nota.troco)}`,
+        { width: LARGURA_UTIL },
+      );
+    }
 
     this.linhaSeparadora(doc);
   }
