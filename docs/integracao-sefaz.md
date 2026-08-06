@@ -113,6 +113,12 @@ protocolo: 135265292865225
 
 Isso valida o fluxo completo ponta a ponta contra o ambiente real: certificado e-CNPJ, mTLS, assinatura XML-DSig, QR Code (`infNFeSupl`), schema e regra de negócio — tudo aceito pela SEFAZ. Note que essa mesma emissão **não** sofreu a rejeição `cStat 1115` (IBS/CBS) descrita acima, reforçando que aquele bloqueio é específico do ambiente de homologação.
 
+### `vTroco` ausente no grupo `pag` (bug real, corrigido)
+
+Inspecionando a consulta pública da NFC-e real autorizada em produção (seção acima) no site da SEFAZ-SP, o campo de troco aparecia como "Troco: NaN" em vez de "Troco: R$ 0,00". A causa: `NfeXmlBuilderService` nunca emitia o elemento opcional `vTroco` (irmão de `detPag`, dentro do grupo `pag`) — sem ele, o parser da página de consulta pública da SEFAZ-SP calcula o troco como indefinido em vez de assumir zero.
+
+Corrigido emitindo `vTroco` sempre (`0.00` por padrão), e adicionado um campo opcional `troco` em `CriarNotaFiscalDto` para informar o valor real de troco de uma venda em dinheiro — quando informado, `vPag` passa a refletir o valor efetivamente recebido (`vProdTotal + troco`), já que a SEFAZ rejeita (erro 866/869) se a soma de `vPag` não bater exatamente com `vNF + vTroco`. Nova coluna `troco` em `NotaFiscal` (migration `1786039023720-AdicionaTroco`). Validado com nova emissão real em homologação: o XML passou pela validação de schema (única rejeição foi o já conhecido `cStat 1115`, sem relação com essa mudança). O DANFE/DANFCE também passou a exibir "Valor pago" e "Troco" no bloco de totais quando `troco > 0`.
+
 ## Próximos passos
 
 - [Roadmap](roadmap.md) — o que falta para cobrir outras UFs, cancelamento, DANFE, etc.
