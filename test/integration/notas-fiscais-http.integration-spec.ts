@@ -55,6 +55,7 @@ const dtoNfce = {
       valorUnitario: 12.5,
     },
   ],
+  formaPagamento: '17', // PIX
 };
 
 /**

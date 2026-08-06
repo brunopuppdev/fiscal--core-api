@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -19,6 +20,7 @@ import { CriarNotaFiscalDto } from './dto/criar-nota.dto';
 import { ItemNota } from './entities/item-nota.entity';
 import { NotaFiscal } from './entities/nota-fiscal.entity';
 import { NumeracaoControle } from './entities/numeracao-controle.entity';
+import { NotaFiscalPdfService } from './pdf/nota-fiscal-pdf.service';
 import { SefazClientService } from './sefaz/sefaz-client.service';
 import { NfeXmlBuilderService } from './xml/nfe-xml-builder.service';
 import { NfeXmlSignerService } from './xml/nfe-xml-signer.service';
@@ -35,6 +37,7 @@ export class NotasFiscaisService {
     private readonly xmlBuilder: NfeXmlBuilderService,
     private readonly xmlSigner: NfeXmlSignerService,
     private readonly sefazClient: SefazClientService,
+    private readonly notaFiscalPdfService: NotaFiscalPdfService,
   ) {}
 
   async emitir(dto: CriarNotaFiscalDto): Promise<NotaFiscal> {
@@ -92,6 +95,7 @@ export class NotasFiscaisService {
       emitente,
       destinatario: dto.destinatario,
       itens: dto.itens,
+      formaPagamento: dto.formaPagamento,
       csc,
       cscId,
     });
@@ -135,6 +139,7 @@ export class NotasFiscaisService {
         ? { ...dto.destinatario.endereco }
         : null,
       valorTotal: valorTotal.toFixed(2),
+      formaPagamento: dto.formaPagamento,
       xmlAssinado,
       dataEmissao,
       itens,
@@ -221,6 +226,28 @@ export class NotasFiscaisService {
 
   async statusServicoSefaz(modelo: ModeloDocumento) {
     return this.sefazClient.consultarStatusServico(modelo);
+  }
+
+  /**
+   * Gera o documento auxiliar (DANFE para NF-e, DANFCE para NFC-e) em PDF. Só é possível para
+   * notas AUTORIZADAS — é o único status em que `xmlAutorizado` e `protocolo` existem, e o PDF
+   * depende de dados vindos diretamente do XML já validado pela SEFAZ (ver `parseXmlAutorizado`).
+   */
+  async gerarPdf(id: string): Promise<{ buffer: Buffer; nomeArquivo: string }> {
+    const nota = await this.buscarPorId(id);
+
+    if (nota.status !== StatusNota.AUTORIZADA) {
+      throw new ConflictException(
+        `Nota fiscal ${id} não está autorizada (status atual: ${nota.status}). ` +
+          'O DANFE/DANFCE só pode ser gerado após a autorização pela SEFAZ.',
+      );
+    }
+
+    const emitente = this.configService.get('emitente', { infer: true });
+    const buffer = await this.notaFiscalPdfService.gerar(nota, emitente);
+    const prefixo = nota.modelo === ModeloDocumento.NFE ? 'danfe' : 'danfce';
+
+    return { buffer, nomeArquivo: `${prefixo}-${nota.chaveAcesso}.pdf` };
   }
 
   private async proximoNumero(

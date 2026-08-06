@@ -28,6 +28,7 @@ Monta o XML da nota, assina com o certificado digital configurado e envia para a
 | `itens[].quantidade` | number (> 0) | sim | Quantidade vendida |
 | `itens[].valorUnitario` | number (> 0) | sim | Valor unitário do item |
 | `itens[].csosn` | string | não (padrão `"102"`) | CSOSN do Simples Nacional/MEI |
+| `formaPagamento` | string (2 dígitos) | sim | Código SEFAZ da forma de pagamento (grupo `pag/detPag` do XML): `01` Dinheiro, `02` Cheque, `03` Cartão de Crédito, `04` Cartão de Débito, `05` Crédito Loja, `10` Vale Alimentação, `11` Vale Refeição, `12` Vale Presente, `13` Vale Combustível, `14` Duplicata Mercantil, `15` Boleto Bancário, `16` Depósito Bancário, `17` PIX, `18` Transferência bancária/Carteira Digital, `19` Fidelidade/Cashback, `90` Sem pagamento, `99` Outros |
 
 ### Exemplo — NFC-e (venda de balcão, consumidor não identificado)
 
@@ -44,7 +45,8 @@ Monta o XML da nota, assina com o certificado digital configurado e envia para a
       "quantidade": 2,
       "valorUnitario": 12.5
     }
-  ]
+  ],
+  "formaPagamento": "17"
 }
 ```
 
@@ -78,7 +80,8 @@ Monta o XML da nota, assina com o certificado digital configurado e envia para a
       "valorUnitario": 12.5,
       "csosn": "102"
     }
-  ]
+  ],
+  "formaPagamento": "03"
 }
 ```
 
@@ -140,6 +143,14 @@ Detalha uma nota fiscal pelo ID interno (UUID gerado pela aplicação, não a ch
 
 Baixa o XML da nota — o autorizado (`<nfeProc>`, com o protocolo da SEFAZ embutido) se disponível, ou apenas o assinado caso a nota ainda não tenha sido autorizada. Retorna `Content-Type: application/xml`. Retorna `404` se a nota não tiver XML disponível ainda.
 
+## `GET /notas-fiscais/:id/pdf`
+
+Gera o documento auxiliar em PDF — DANFE (retrato) para NF-e (modelo 55) ou DANFCE (cupom, folha A4) para NFC-e (modelo 65). O layout é escolhido automaticamente pelo `modelo` da nota, sem necessidade de query param.
+
+Só funciona para notas com `status: "AUTORIZADA"` — é o único status em que existem `xmlAutorizado` e `protocolo`, dos quais o PDF depende (data/hora de autorização, QR Code da NFC-e e o texto exato de informações complementares vêm do XML autorizado, não das colunas soltas do banco, para garantir fidelidade ao que foi realmente aceito pela SEFAZ). Para qualquer outro status, retorna `409 Conflict`. Retorna `404` se a nota não existir.
+
+Retorna `Content-Type: application/pdf`.
+
 ## Objeto "Nota Fiscal"
 
 Formato retornado por `POST /notas-fiscais`, `GET /notas-fiscais` (dentro de `dados`) e `GET /notas-fiscais/:id`:
@@ -153,6 +164,7 @@ Formato retornado por `POST /notas-fiscais`, `GET /notas-fiscais` (dentro de `da
 | `chaveAcesso` | string (44 dígitos) | Chave de acesso da NF-e/NFC-e |
 | `status` | enum | `RASCUNHO`, `ASSINADA`, `ENVIADA`, `AUTORIZADA`, `REJEITADA`, `CANCELADA`, `ERRO` |
 | `valorTotal` | string | Soma dos itens |
+| `formaPagamento` | string (2 dígitos) | Código SEFAZ da forma de pagamento informada na emissão (grupo `pag/detPag` do XML) |
 | `protocolo` | string \| null | Número de protocolo de autorização da SEFAZ (quando autorizada) |
 | `motivoStatus` | string \| null | Motivo retornado pela SEFAZ (autorização, rejeição, ou erro de comunicação) |
 | `dataEmissao` | datetime | Data/hora de emissão |

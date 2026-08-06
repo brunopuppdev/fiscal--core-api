@@ -7,11 +7,13 @@ import {
   Param,
   Post,
   Query,
+  StreamableFile,
 } from '@nestjs/common';
 import {
   ApiOkResponse,
   ApiOperation,
   ApiParam,
+  ApiProduces,
   ApiQuery,
   ApiTags,
 } from '@nestjs/swagger';
@@ -96,5 +98,23 @@ export class NotasFiscaisController {
       throw new NotFoundException('XML ainda não disponível para esta nota.');
     }
     return xml;
+  }
+
+  @Get(':id/pdf')
+  @ApiOperation({
+    summary:
+      'Gera o documento auxiliar em PDF (DANFE para NF-e, DANFCE para NFC-e)',
+    description:
+      'Só disponível para notas com status AUTORIZADA — o PDF é montado a partir do XML ' +
+      'autorizado (dados oficiais da SEFAZ, como data/hora de autorização e QR Code).',
+  })
+  @ApiParam({ name: 'id', description: 'ID interno da nota fiscal' })
+  @ApiProduces('application/pdf')
+  async baixarPdf(@Param('id') id: string): Promise<StreamableFile> {
+    const { buffer, nomeArquivo } = await this.notasFiscaisService.gerarPdf(id);
+    return new StreamableFile(buffer, {
+      type: 'application/pdf',
+      disposition: `inline; filename="${nomeArquivo}"`,
+    });
   }
 }

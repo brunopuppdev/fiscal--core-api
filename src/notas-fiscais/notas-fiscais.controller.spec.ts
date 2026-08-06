@@ -1,4 +1,9 @@
-import { NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  NotFoundException,
+  StreamableFile,
+} from '@nestjs/common';
+import { FormaPagamento } from '../common/enums/forma-pagamento.enum';
 import { ModeloDocumento } from '../common/enums/modelo-documento.enum';
 import { StatusNota } from '../common/enums/status-nota.enum';
 import { CriarNotaFiscalDto } from './dto/criar-nota.dto';
@@ -21,6 +26,7 @@ function notaFixture(overrides: Partial<NotaFiscal> = {}): NotaFiscal {
     destinatarioEmail: null,
     destinatarioEndereco: null,
     valorTotal: '20.00',
+    formaPagamento: '17',
     xmlAssinado: '<NFe>ASSINADO</NFe>',
     xmlAutorizado: '<nfeProc>AUTORIZADO</nfeProc>',
     protocolo: '135260000012345',
@@ -42,6 +48,7 @@ describe('NotasFiscaisController', () => {
     listar: jest.Mock;
     statusServicoSefaz: jest.Mock;
     buscarPorId: jest.Mock;
+    gerarPdf: jest.Mock;
   };
 
   beforeEach(() => {
@@ -50,6 +57,7 @@ describe('NotasFiscaisController', () => {
       listar: jest.fn(),
       statusServicoSefaz: jest.fn(),
       buscarPorId: jest.fn(),
+      gerarPdf: jest.fn(),
     };
     controller = new NotasFiscaisController(
       serviceMock as unknown as NotasFiscaisService,
@@ -70,6 +78,7 @@ describe('NotasFiscaisController', () => {
             valorUnitario: 10,
           },
         ],
+        formaPagamento: FormaPagamento.PIX,
       };
       const notaCriada = notaFixture();
       serviceMock.emitir.mockResolvedValue(notaCriada);
@@ -88,6 +97,7 @@ describe('NotasFiscaisController', () => {
         controller.emitir({
           modelo: ModeloDocumento.NFE,
           itens: [],
+          formaPagamento: FormaPagamento.PIX,
         }),
       ).rejects.toThrow(erro);
     });
@@ -231,6 +241,35 @@ describe('NotasFiscaisController', () => {
 
       await expect(controller.baixarXml('id-inexistente')).rejects.toThrow(
         NotFoundException,
+      );
+    });
+  });
+
+  describe('baixarPdf (GET /notas-fiscais/:id/pdf)', () => {
+    it('delega para NotasFiscaisService.gerarPdf e retorna um StreamableFile com o PDF', async () => {
+      const bufferFixture = Buffer.from('%PDF-FAKE');
+      serviceMock.gerarPdf.mockResolvedValue({
+        buffer: bufferFixture,
+        nomeArquivo: 'danfce-35260812345678000199650010000000011000000015.pdf',
+      });
+
+      const resultado = await controller.baixarPdf(
+        'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11',
+      );
+
+      expect(serviceMock.gerarPdf).toHaveBeenCalledWith(
+        'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11',
+      );
+      expect(resultado).toBeInstanceOf(StreamableFile);
+    });
+
+    it('propaga ConflictException quando o service recusa gerar PDF de nota não autorizada', async () => {
+      serviceMock.gerarPdf.mockRejectedValue(
+        new ConflictException('Nota fiscal nota-1 não está autorizada.'),
+      );
+
+      await expect(controller.baixarPdf('nota-1')).rejects.toThrow(
+        ConflictException,
       );
     });
   });

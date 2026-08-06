@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { DataSource } from 'typeorm';
 import { AppModule } from '../../src/app.module';
 import { CertificadoService } from '../../src/certificado/certificado.service';
+import { FormaPagamento } from '../../src/common/enums/forma-pagamento.enum';
 import { ModeloDocumento } from '../../src/common/enums/modelo-documento.enum';
 import { CriarNotaFiscalDto } from '../../src/notas-fiscais/dto/criar-nota.dto';
 import { NotasFiscaisService } from '../../src/notas-fiscais/notas-fiscais.service';
@@ -75,6 +76,7 @@ describe('Numeração sequencial sob concorrência real (integração)', () => {
           valorUnitario: 10,
         },
       ],
+      formaPagamento: FormaPagamento.PIX,
     };
   }
 

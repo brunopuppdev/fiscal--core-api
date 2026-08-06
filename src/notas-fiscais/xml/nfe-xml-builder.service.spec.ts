@@ -54,6 +54,7 @@ function dadosFixture(
     ambiente: 2,
     emitente: emitenteFixture,
     itens: [itemFixture()],
+    formaPagamento: '17', // PIX
     // Modelo padrão da fixture é NFCE, que exige CSC/CSC ID para montar o infNFeSupl.
     csc: 'CSC-FIXTURE-DE-TESTE',
     cscId: '1',
@@ -127,6 +128,10 @@ interface XmlInfNFeSupl {
   qrCode: string;
   urlChave: string;
 }
+interface XmlDetPag {
+  tPag: string;
+  vPag: string;
+}
 interface XmlNfeDoc {
   NFe: {
     infNFe: {
@@ -136,6 +141,7 @@ interface XmlNfeDoc {
       dest?: XmlDest;
       det: XmlDet | XmlDet[];
       total: { ICMSTot: { vProd: string; vNF: string } };
+      pag: { detPag: XmlDetPag };
     };
     infNFeSupl?: XmlInfNFeSupl;
   };
@@ -313,6 +319,27 @@ describe('NfeXmlBuilderService', () => {
 
       expect(total.vProd).toBe('34.90');
       expect(total.vNF).toBe('34.90');
+    });
+  });
+
+  describe('montar - pag/detPag', () => {
+    it('usa o código de formaPagamento informado em tPag (não mais fixo em dinheiro)', () => {
+      const xml = service.montar(dadosFixture({ formaPagamento: '03' })); // Cartão de Crédito
+      const doc = parseXml(xml);
+
+      expect(doc.NFe.infNFe.pag.detPag.tPag).toBe('03');
+    });
+
+    it('mantém vPag igual à soma dos itens (vProd), independente da forma de pagamento', () => {
+      const xml = service.montar(
+        dadosFixture({
+          formaPagamento: '17',
+          itens: [itemFixture({ quantidade: 2, valorUnitario: 12.5 })],
+        }),
+      );
+      const doc = parseXml(xml);
+
+      expect(doc.NFe.infNFe.pag.detPag.vPag).toBe('25.00');
     });
   });
 

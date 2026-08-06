@@ -71,6 +71,19 @@ export class NotaFiscal {
   @Column({ name: 'valor_total', type: 'numeric', precision: 12, scale: 2 })
   valorTotal: string;
 
+  @Column({
+    name: 'forma_pagamento',
+    type: 'varchar',
+    length: 2,
+    comment:
+      'Código SEFAZ da forma de pagamento (grupo pag/detPag do XML): ' +
+      '01 Dinheiro, 02 Cheque, 03 Cartão de Crédito, 04 Cartão de Débito, 05 Crédito Loja, ' +
+      '10 Vale Alimentação, 11 Vale Refeição, 12 Vale Presente, 13 Vale Combustível, ' +
+      '14 Duplicata Mercantil, 15 Boleto Bancário, 16 Depósito Bancário, 17 PIX, ' +
+      '18 Transferência bancária/Carteira Digital, 19 Fidelidade/Cashback, 90 Sem pagamento, 99 Outros',
+  })
+  formaPagamento: string;
+
   @Column({ name: 'xml_assinado', type: 'text', nullable: true })
   xmlAssinado: string | null;
 

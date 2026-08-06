@@ -1,8 +1,13 @@
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  NotFoundException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { DataSource, Repository } from 'typeorm';
 import { AppConfig, EmitenteConfig } from '../config/configuration';
 import { AppLogger } from '../common/logger/app-logger';
+import { FormaPagamento } from '../common/enums/forma-pagamento.enum';
 import { ModeloDocumento } from '../common/enums/modelo-documento.enum';
 import { StatusNota } from '../common/enums/status-nota.enum';
 import { CriarNotaFiscalDto } from './dto/criar-nota.dto';
@@ -10,6 +15,7 @@ import { ItemNotaDto } from './dto/item-nota.dto';
 import { NumeracaoControle } from './entities/numeracao-controle.entity';
 import { NotaFiscal } from './entities/nota-fiscal.entity';
 import { NotasFiscaisService } from './notas-fiscais.service';
+import { NotaFiscalPdfService } from './pdf/nota-fiscal-pdf.service';
 import {
   RetornoAutorizacao,
   SefazClientService,
@@ -51,6 +57,7 @@ function dtoNfce(
   return {
     modelo: ModeloDocumento.NFCE,
     itens: [itemDtoFixture()],
+    formaPagamento: FormaPagamento.PIX,
     ...overrides,
   };
 }
@@ -62,6 +69,7 @@ function dtoNfe(
     modelo: ModeloDocumento.NFE,
     destinatario: { documento: '11122233344' }, // CPF fictício
     itens: [itemDtoFixture()],
+    formaPagamento: FormaPagamento.PIX,
     ...overrides,
   };
 }
@@ -98,6 +106,7 @@ describe('NotasFiscaisService', () => {
     autorizar: jest.Mock;
     consultarStatusServico: jest.Mock;
   };
+  let notaFiscalPdfServiceMock: { gerar: jest.Mock };
   /**
    * Snapshot (cópia rasa) do estado de `nota` em cada chamada de `save`. Necessário porque
    * o service reutiliza/mutação o mesmo objeto entre a primeira persistência (ASSINADA) e a
@@ -171,6 +180,7 @@ describe('NotasFiscaisService', () => {
       autorizar: jest.fn(),
       consultarStatusServico: jest.fn(),
     };
+    notaFiscalPdfServiceMock = { gerar: jest.fn() };
 
     service = new NotasFiscaisService(
       notaFiscalRepoMock as unknown as Repository<NotaFiscal>,
@@ -179,6 +189,7 @@ describe('NotasFiscaisService', () => {
       xmlBuilderMock as unknown as NfeXmlBuilderService,
       xmlSignerMock as unknown as NfeXmlSignerService,
       sefazClientMock as unknown as SefazClientService,
+      notaFiscalPdfServiceMock as unknown as NotaFiscalPdfService,
     );
   });
 
@@ -527,6 +538,85 @@ describe('NotasFiscaisService', () => {
         ModeloDocumento.NFCE,
       );
       expect(resultado).toBe(statusMock);
+    });
+  });
+
+  describe('gerarPdf', () => {
+    function notaAutorizadaFixture(
+      overrides: Partial<NotaFiscal> = {},
+    ): NotaFiscal {
+      return {
+        id: 'nota-1',
+        modelo: ModeloDocumento.NFCE,
+        serie: 1,
+        numero: 1,
+        chaveAcesso: '35260812345678000199650010000000011000000015',
+        status: StatusNota.AUTORIZADA,
+        ambiente: 2,
+        naturezaOperacao: 'VENDA',
+        destinatarioNome: null,
+        destinatarioDocumento: null,
+        destinatarioEmail: null,
+        destinatarioEndereco: null,
+        valorTotal: '20.00',
+        formaPagamento: '17',
+        xmlAssinado: '<NFe>ASSINADO</NFe>',
+        xmlAutorizado: '<nfeProc>AUTORIZADO</nfeProc>',
+        protocolo: '135260000012345',
+        motivoStatus: 'Autorizado o uso da NF-e',
+        codigoStatus: '100',
+        dataEmissao: new Date('2026-01-01T12:00:00Z'),
+        dataAutorizacao: new Date('2026-01-01T12:00:05Z'),
+        itens: [],
+        createdAt: new Date('2026-01-01T12:00:00Z'),
+        updatedAt: new Date('2026-01-01T12:00:05Z'),
+        ...overrides,
+      };
+    }
+
+    it('lança ConflictException quando a nota não está AUTORIZADA', async () => {
+      notaFiscalRepoMock.findOne.mockResolvedValue(
+        notaAutorizadaFixture({ status: StatusNota.REJEITADA }),
+      );
+
+      await expect(service.gerarPdf('nota-1')).rejects.toThrow(
+        ConflictException,
+      );
+      expect(notaFiscalPdfServiceMock.gerar).not.toHaveBeenCalled();
+    });
+
+    it('delega para NotaFiscalPdfService.gerar e monta o nome do arquivo pelo modelo (danfce para NFC-e)', async () => {
+      const nota = notaAutorizadaFixture();
+      notaFiscalRepoMock.findOne.mockResolvedValue(nota);
+      const bufferFixture = Buffer.from('PDF-FAKE');
+      notaFiscalPdfServiceMock.gerar.mockResolvedValue(bufferFixture);
+
+      const resultado = await service.gerarPdf('nota-1');
+
+      expect(notaFiscalPdfServiceMock.gerar).toHaveBeenCalledWith(
+        nota,
+        emitenteFixture,
+      );
+      expect(resultado.buffer).toBe(bufferFixture);
+      expect(resultado.nomeArquivo).toBe(`danfce-${nota.chaveAcesso}.pdf`);
+    });
+
+    it('monta o nome do arquivo com prefixo "danfe" para NF-e (modelo 55)', async () => {
+      const nota = notaAutorizadaFixture({ modelo: ModeloDocumento.NFE });
+      notaFiscalRepoMock.findOne.mockResolvedValue(nota);
+      notaFiscalPdfServiceMock.gerar.mockResolvedValue(Buffer.from('PDF'));
+
+      const resultado = await service.gerarPdf('nota-1');
+
+      expect(resultado.nomeArquivo).toBe(`danfe-${nota.chaveAcesso}.pdf`);
+    });
+
+    it('propaga NotFoundException quando a nota não existe', async () => {
+      notaFiscalRepoMock.findOne.mockResolvedValue(null);
+
+      await expect(service.gerarPdf('id-inexistente')).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 });

@@ -8,6 +8,7 @@ import {
   IsString,
   ValidateNested,
 } from 'class-validator';
+import { FormaPagamento } from '../../common/enums/forma-pagamento.enum';
 import { ModeloDocumento } from '../../common/enums/modelo-documento.enum';
 import { DestinatarioDto } from './destinatario.dto';
 import { ItemNotaDto } from './item-nota.dto';
@@ -46,4 +47,13 @@ export class CriarNotaFiscalDto {
   @ValidateNested({ each: true })
   @Type(() => ItemNotaDto)
   itens: ItemNotaDto[];
+
+  @ApiProperty({
+    enum: FormaPagamento,
+    example: FormaPagamento.PIX,
+    description:
+      'Código SEFAZ da forma de pagamento (grupo pag/detPag do XML) — vai para tPag.',
+  })
+  @IsEnum(FormaPagamento)
+  formaPagamento: FormaPagamento;
 }

@@ -21,6 +21,7 @@ function dtoNfcePlano(
     modelo: ModeloDocumento.NFCE,
     naturezaOperacao: 'VENDA',
     itens: [itemValidoPlano()],
+    formaPagamento: '17', // PIX
     ...overrides,
   };
 }
@@ -113,6 +114,22 @@ describe('CriarNotaFiscalDto', () => {
     delete dados.destinatario;
     const erros = await validarPlano(dados);
     expect(erros).toHaveLength(0);
+  });
+
+  it('rejeita formaPagamento ausente', async () => {
+    const dados = dtoNfcePlano();
+    delete dados.formaPagamento;
+    const erros = await validarPlano(dados);
+    expect(erros.some((e) => e.property === 'formaPagamento')).toBe(true);
+  });
+
+  it('rejeita formaPagamento com código fora da tabela SEFAZ', async () => {
+    const erros = await validarPlano(dtoNfcePlano({ formaPagamento: '77' }));
+    const erroFormaPagamento = erros.find(
+      (e) => e.property === 'formaPagamento',
+    );
+    expect(erroFormaPagamento).toBeDefined();
+    expect(erroFormaPagamento?.constraints).toHaveProperty('isEnum');
   });
 
   // A regra de negócio "NF-e (55) exige destinatario.documento" NÃO é uma constraint de

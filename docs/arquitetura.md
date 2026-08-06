@@ -7,8 +7,11 @@
 - **node-forge** — leitura do certificado digital `.pfx` (PKCS#12) e extração da chave privada/certificado.
 - **xmlbuilder2** — montagem do XML da NF-e/NFC-e (layout 4.00).
 - **xml-crypto** — assinatura digital do XML (XML-DSig, enveloped, C14N, RSA-SHA1 — exigência do próprio padrão da NF-e).
-- **fast-xml-parser** — parse das respostas SOAP da SEFAZ.
+- **fast-xml-parser** — parse das respostas SOAP da SEFAZ e do XML autorizado (para gerar o PDF).
 - **`https` nativo do Node** — chamadas SOAP diretas à SEFAZ com mTLS (sem biblioteca SOAP externa).
+- **pdfkit** — geração do DANFE (NF-e) e DANFCE (NFC-e) em PDF.
+- **bwip-js** — código de barras (Code 128) da chave de acesso no DANFE/DANFCE.
+- **qrcode** — imagem do QR Code da NFC-e embutida no DANFCE.
 - **Swagger (`@nestjs/swagger`)** — documentação interativa em `/docs`.
 
 Não há fila, worker ou dependência de infraestrutura além do PostgreSQL — a aplicação é um único processo Nest.
@@ -37,6 +40,15 @@ src/
     │   ├── sefaz-client.service.ts     # Cliente dos webservices SOAP da SEFAZ-SP
     │   ├── soap-envelope.util.ts       # Monta o envelope SOAP 1.2 (layout 4.00)
     │   └── soap-http.util.ts           # POST HTTPS bruto com o agent mTLS
+    ├── pdf/
+    │   ├── nota-fiscal-pdf.service.ts       # Facade: escolhe DANFE ou DANFCE pelo modelo da nota
+    │   ├── danfe-pdf.service.ts             # Layout do DANFE (NF-e, retrato)
+    │   ├── danfce-pdf.service.ts            # Layout do DANFCE (NFC-e, cupom)
+    │   ├── xml-nota-autorizada-parser.util.ts  # Extrai os dados do <nfeProc> autorizado
+    │   ├── formatadores-danfe.util.ts       # Formatação de campos (datas, valores, chave) para o PDF
+    │   ├── codigo-barras-chave.util.ts      # Código de barras (Code 128) da chave de acesso
+    │   ├── qrcode-imagem.util.ts            # Imagem do QR Code da NFC-e para o DANFCE
+    │   └── pdf-buffer.util.ts               # Serializa o documento pdfkit em Buffer
     ├── notas-fiscais.service.ts        # Orquestra: numeração → XML → assinatura → SEFAZ → persistência
     ├── notas-fiscais.controller.ts     # Endpoints HTTP
     └── notas-fiscais.module.ts
@@ -48,7 +60,7 @@ src/
 2. **Reserva do número** — dentro de uma transação com `pessimistic_write` lock na tabela `numeracao_controle` (chave: modelo + série), garantindo numeração sequencial mesmo sob chamadas concorrentes.
 3. **Geração da chave de acesso** — `montarChaveAcesso` monta os 43 dígitos (UF, AAMM, CNPJ, modelo, série, número, tipo de emissão, código numérico aleatório) e calcula o dígito verificador via módulo 11.
 4. **Montagem do XML** — `NfeXmlBuilderService` gera o XML NFe 4.00 completo (`ide`, `emit`, `dest`, `det` por item, `total`, `transp`, `pag`, `infAdic`), assumindo o cenário padrão MEI/Simples Nacional (CSOSN informado por item, PIS/COFINS CST 49, CRT 4 — código
-   específico de MEI desde 01/04/2025, Ajuste SINIEF 43/2023). Para NFC-e (modelo 65), monta também o grupo `infNFeSupl` (QR Code) — veja [Guia fiscal § QR Code da NFC-e](guia-fiscal.md#qr-code-da-nfc-e-csc).
+   específico de MEI desde 01/04/2025, Ajuste SINIEF 43/2023). O grupo `pag/detPag` usa a `formaPagamento` informada no `CriarNotaFiscalDto` (campo obrigatório, código SEFAZ — ver `common/enums/forma-pagamento.enum.ts`), não um valor fixo. Para NFC-e (modelo 65), monta também o grupo `infNFeSupl` (QR Code) — veja [Guia fiscal § QR Code da NFC-e](guia-fiscal.md#qr-code-da-nfc-e-csc).
 5. **Assinatura digital** — `NfeXmlSignerService` assina o elemento `<infNFe>` (enveloped signature, C14N, RSA-SHA1) usando a chave privada extraída do certificado `.pfx`.
 6. **Persistência inicial** — a nota é salva no banco com `status: ASSINADA` **antes** de tentar o envio à SEFAZ, para não perder o registro em caso de falha de rede.
 7. **Envio à SEFAZ** — `SefazClientService.autorizar` envia o XML assinado via SOAP (`NFeAutorizacao4`, lote síncrono `indSinc=1`). O retorno atualiza a nota:
@@ -63,7 +75,7 @@ Não há fila ou retry assíncrono: a chamada HTTP só retorna depois que a SEFA
 
 ### `notas_fiscais`
 
-Uma linha por nota emitida (tentativa de emissão, mais precisamente — mesmo notas rejeitadas ficam registradas). Campos principais: `modelo`, `serie`, `numero`, `chave_acesso` (único), `status`, `ambiente`, dados do destinatário (desnormalizados: nome, documento, email, endereço em JSONB), `valor_total`, `xml_assinado`, `xml_autorizado`, `protocolo`, `motivo_status`, `codigo_status`, `data_emissao`, `data_autorizacao`.
+Uma linha por nota emitida (tentativa de emissão, mais precisamente — mesmo notas rejeitadas ficam registradas). Campos principais: `modelo`, `serie`, `numero`, `chave_acesso` (único), `status`, `ambiente`, dados do destinatário (desnormalizados: nome, documento, email, endereço em JSONB), `valor_total`, `forma_pagamento` (código SEFAZ do grupo `pag/detPag`, obrigatório), `xml_assinado`, `xml_autorizado`, `protocolo`, `motivo_status`, `codigo_status`, `data_emissao`, `data_autorizacao`.
 
 ### `itens_nota`
 
@@ -83,6 +95,12 @@ O schema é versionado por migrations do TypeORM (`src/migrations/`, geradas/apl
 - **mTLS com a SEFAZ** — um `https.Agent` construído com o `.pfx` bruto + senha (`pfx`/`passphrase`), usado em toda chamada SOAP (`SefazClientService` → `soap-http.util.ts`).
 
 Se o certificado não existir no caminho configurado, a aplicação sobe normalmente (por exemplo, para consultar o Swagger), mas qualquer operação que dependa dele falha com uma mensagem explícita.
+
+## Documento auxiliar em PDF (DANFE/DANFCE)
+
+`GET /notas-fiscais/:id/pdf` gera o documento auxiliar — DANFE (retrato) para NF-e, DANFCE (cupom) para NFC-e — só para notas com `status: AUTORIZADA`; para qualquer outro status retorna `409 Conflict`.
+
+`NotaFiscalPdfService` (`notas-fiscais/pdf/`) é uma facade que escolhe `DanfePdfService` ou `DanfcePdfService` conforme o `modelo` da nota. Os dados vêm do `xmlAutorizado` (`<nfeProc>`) persistido, não das colunas soltas do banco — `xml-nota-autorizada-parser.util.ts` faz esse parse — para garantir que o PDF reflita exatamente o que a SEFAZ aceitou (data/hora de autorização, protocolo, QR Code da NFC-e). `codigo-barras-chave.util.ts` (via `bwip-js`) e `qrcode-imagem.util.ts` (via `qrcode`) geram as imagens embutidas no PDF; `pdfkit` monta o documento.
 
 ## Próximos passos
 

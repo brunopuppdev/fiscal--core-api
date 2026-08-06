@@ -6,7 +6,6 @@ Este projeto cobre o caminho principal de emissão de NF-e/NFC-e para um MEI, ma
 
 - **Só SP está configurado** em `src/config/sefaz-endpoints.ts`. Outras UFs exigem adicionar os endpoints correspondentes — a maioria usa o ambiente **SVRS** compartilhado entre estados. Veja [Integração com a SEFAZ](integracao-sefaz.md#só-sp-está-configurado).
 - **Sem cancelamento de nota**, **carta de correção** ou **inutilização de numeração** — nenhum dos eventos da NF-e (`NFeRecepcaoEvento4`) está implementado.
-- **Não gera DANFE/DANFCE em PDF** — a API entrega apenas o XML (autorizado ou assinado). Impressão do documento auxiliar fica por conta de quem consome a API.
 - **Fluxo de autorização assíncrona não é tratado** — o cliente sempre assume `indSinc=1` (resposta síncrona da SEFAZ). Se algum estado retornar lote em processamento (`cStat` 103/105), a consulta posterior via `NFeRetAutorizacao4` precisaria ser implementada.
 - **`NFeConsultaProtocolo4` já está implementado no cliente** (`SefazClientService.consultarProtocolo`), mas ainda não está exposto como endpoint HTTP.
 - **Emissão real validada ponta a ponta em produção** — em 05/08/2026, uma NFC-e foi autorizada pela SEFAZ-SP real (`cStat 100`, protocolo obtido, nota persistida com `status: AUTORIZADA`). Certificado e-CNPJ, assinatura XML-DSig, QR Code (`infNFeSupl`) e schema todos confirmados corretos contra o ambiente de produção. Veja [Integração com a SEFAZ § Status real de teste](integracao-sefaz.md#status-real-de-teste-homologação-sefaz-sp).
@@ -19,7 +18,6 @@ Nenhuma promessa de prazo — é uma lista de possibilidades para quem quiser co
 
 - Cancelamento de NF-e/NFC-e (evento `110111`).
 - Carta de correção eletrônica (CC-e).
-- Geração de DANFE (NF-e) e DANFCE (NFC-e) em PDF.
 - Suporte a outras UFs (começando pelo ambiente SVRS compartilhado).
 - Endpoint HTTP para `NFeConsultaProtocolo4`.
 - Suporte a certificado A3 (token/smartcard), hoje só A1 (`.pfx`) é suportado.

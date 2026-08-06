@@ -10,6 +10,7 @@ export class NotaFiscalResponseDto {
   @ApiProperty() chaveAcesso: string;
   @ApiProperty({ enum: StatusNota }) status: StatusNota;
   @ApiProperty() valorTotal: string;
+  @ApiProperty() formaPagamento: string;
   @ApiProperty({ required: false, nullable: true }) protocolo: string | null;
   @ApiProperty({ required: false, nullable: true }) motivoStatus: string | null;
   @ApiProperty() dataEmissao: Date;

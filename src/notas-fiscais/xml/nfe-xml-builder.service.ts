@@ -23,6 +23,8 @@ export interface DadosMontagemNfe {
   emitente: EmitenteConfig;
   destinatario?: DestinatarioDto;
   itens: ItemNotaDto[];
+  /** Código SEFAZ da forma de pagamento (grupo pag/detPag) — ver enum FormaPagamento. */
+  formaPagamento: string;
   /** CSC e CSC ID (credenciamento NFC-e na SEFAZ) — obrigatórios só quando modelo=NFCE. */
   csc?: string;
   cscId?: string;
@@ -228,7 +230,7 @@ export class NfeXmlBuilderService {
 
     // ---- pag ----
     const pag = doc.ele('pag').ele('detPag');
-    pag.ele('tPag').txt('01'); // 01 = dinheiro (ajuste conforme forma de pagamento real)
+    pag.ele('tPag').txt(dados.formaPagamento);
     pag.ele('vPag').txt(fmt(vProdTotal, 2));
 
     // ---- infAdic ----
