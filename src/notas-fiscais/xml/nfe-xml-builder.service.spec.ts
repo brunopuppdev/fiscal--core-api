@@ -141,7 +141,7 @@ interface XmlNfeDoc {
       dest?: XmlDest;
       det: XmlDet | XmlDet[];
       total: { ICMSTot: { vProd: string; vNF: string } };
-      pag: { detPag: XmlDetPag };
+      pag: { detPag: XmlDetPag; vTroco: string };
     };
     infNFeSupl?: XmlInfNFeSupl;
   };
@@ -330,7 +330,7 @@ describe('NfeXmlBuilderService', () => {
       expect(doc.NFe.infNFe.pag.detPag.tPag).toBe('03');
     });
 
-    it('mantém vPag igual à soma dos itens (vProd), independente da forma de pagamento', () => {
+    it('mantém vPag igual à soma dos itens (vProd) quando não há troco informado', () => {
       const xml = service.montar(
         dadosFixture({
           formaPagamento: '17',
@@ -340,6 +340,33 @@ describe('NfeXmlBuilderService', () => {
       const doc = parseXml(xml);
 
       expect(doc.NFe.infNFe.pag.detPag.vPag).toBe('25.00');
+    });
+
+    it('sempre monta o elemento vTroco, mesmo "0.00" quando não há troco informado', () => {
+      const xml = service.montar(dadosFixture());
+      const doc = parseXml(xml);
+
+      expect(doc.NFe.infNFe.pag.vTroco).toBe('0.00');
+    });
+
+    it('posiciona vTroco como irmão de detPag (fora dele), conforme schema', () => {
+      const xml = service.montar(dadosFixture());
+
+      expect(xml).toMatch(/<\/detPag><vTroco>0\.00<\/vTroco>/);
+    });
+
+    it('soma o troco a vPag e reflete o valor em vTroco quando troco é informado', () => {
+      const xml = service.montar(
+        dadosFixture({
+          itens: [itemFixture({ quantidade: 1, valorUnitario: 10 })], // vProd = 10.00
+          troco: 5,
+        }),
+      );
+      const doc = parseXml(xml);
+
+      expect(doc.NFe.infNFe.pag.detPag.vPag).toBe('15.00');
+      expect(doc.NFe.infNFe.pag.vTroco).toBe('5.00');
+      expect(doc.NFe.infNFe.total.ICMSTot.vNF).toBe('10.00');
     });
   });
 

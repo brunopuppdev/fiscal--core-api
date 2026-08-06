@@ -96,6 +96,7 @@ export class NotasFiscaisService {
       destinatario: dto.destinatario,
       itens: dto.itens,
       formaPagamento: dto.formaPagamento,
+      troco: dto.troco,
       csc,
       cscId,
     });
@@ -140,6 +141,7 @@ export class NotasFiscaisService {
         : null,
       valorTotal: valorTotal.toFixed(2),
       formaPagamento: dto.formaPagamento,
+      troco: (dto.troco ?? 0).toFixed(2),
       xmlAssinado,
       dataEmissao,
       itens,

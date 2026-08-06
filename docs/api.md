@@ -29,6 +29,7 @@ Monta o XML da nota, assina com o certificado digital configurado e envia para a
 | `itens[].valorUnitario` | number (> 0) | sim | Valor unitário do item |
 | `itens[].csosn` | string | não (padrão `"102"`) | CSOSN do Simples Nacional/MEI |
 | `formaPagamento` | string (2 dígitos) | sim | Código SEFAZ da forma de pagamento (grupo `pag/detPag` do XML): `01` Dinheiro, `02` Cheque, `03` Cartão de Crédito, `04` Cartão de Débito, `05` Crédito Loja, `10` Vale Alimentação, `11` Vale Refeição, `12` Vale Presente, `13` Vale Combustível, `14` Duplicata Mercantil, `15` Boleto Bancário, `16` Depósito Bancário, `17` PIX, `18` Transferência bancária/Carteira Digital, `19` Fidelidade/Cashback, `90` Sem pagamento, `99` Outros |
+| `troco` | number (>= 0) | não (padrão `0`) | Troco dado ao cliente (grupo `pag/vTroco` do XML). Só relevante em vendas em dinheiro com valor recebido maior que o total — `vPag` passa a refletir o valor total + troco |
 
 ### Exemplo — NFC-e (venda de balcão, consumidor não identificado)
 
@@ -165,6 +166,7 @@ Formato retornado por `POST /notas-fiscais`, `GET /notas-fiscais` (dentro de `da
 | `status` | enum | `RASCUNHO`, `ASSINADA`, `ENVIADA`, `AUTORIZADA`, `REJEITADA`, `CANCELADA`, `ERRO` |
 | `valorTotal` | string | Soma dos itens |
 | `formaPagamento` | string (2 dígitos) | Código SEFAZ da forma de pagamento informada na emissão (grupo `pag/detPag` do XML) |
+| `troco` | string | Troco dado ao cliente (grupo `pag/vTroco` do XML), `"0.00"` quando não informado |
 | `protocolo` | string \| null | Número de protocolo de autorização da SEFAZ (quando autorizada) |
 | `motivoStatus` | string \| null | Motivo retornado pela SEFAZ (autorização, rejeição, ou erro de comunicação) |
 | `dataEmissao` | datetime | Data/hora de emissão |

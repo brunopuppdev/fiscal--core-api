@@ -84,6 +84,17 @@ export class NotaFiscal {
   })
   formaPagamento: string;
 
+  @Column({
+    type: 'numeric',
+    precision: 12,
+    scale: 2,
+    default: '0.00',
+    comment:
+      'Valor do troco dado ao cliente (grupo pag/vTroco do XML). Positivo só em vendas à ' +
+      'vista com troco (ex.: pagamento em dinheiro com valor recebido maior que o total).',
+  })
+  troco: string;
+
   @Column({ name: 'xml_assinado', type: 'text', nullable: true })
   xmlAssinado: string | null;
 

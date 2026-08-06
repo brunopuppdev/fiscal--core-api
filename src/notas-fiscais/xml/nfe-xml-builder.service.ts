@@ -25,6 +25,12 @@ export interface DadosMontagemNfe {
   itens: ItemNotaDto[];
   /** Código SEFAZ da forma de pagamento (grupo pag/detPag) — ver enum FormaPagamento. */
   formaPagamento: string;
+  /**
+   * Troco dado ao cliente (grupo pag/vTroco, irmão de detPag). Quando informado, vPag passa
+   * a refletir o valor efetivamente recebido (vProdTotal + troco) — a SEFAZ rejeita (erro
+   * 866/869) se sum(vPag) > vNF e a diferença não bater exatamente com vTroco.
+   */
+  troco?: number;
   /** CSC e CSC ID (credenciamento NFC-e na SEFAZ) — obrigatórios só quando modelo=NFCE. */
   csc?: string;
   cscId?: string;
@@ -229,9 +235,14 @@ export class NfeXmlBuilderService {
     doc.ele('transp').ele('modFrete').txt('9'); // 9 = sem transporte
 
     // ---- pag ----
+    const troco = dados.troco ?? 0;
     const pag = doc.ele('pag').ele('detPag');
     pag.ele('tPag').txt(dados.formaPagamento);
-    pag.ele('vPag').txt(fmt(vProdTotal, 2));
+    pag.ele('vPag').txt(fmt(vProdTotal + troco, 2));
+    // vTroco é irmão de detPag (não filho) — .up() sobe de detPag para pag.
+    // Sempre emitido (mesmo 0.00): sem ele, o site de consulta pública da SEFAZ
+    // exibe "Troco: NaN" em vez de "Troco: R$ 0,00".
+    pag.up().ele('vTroco').txt(fmt(troco, 2));
 
     // ---- infAdic ----
     doc

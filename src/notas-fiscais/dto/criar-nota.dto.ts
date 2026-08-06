@@ -4,8 +4,10 @@ import {
   ArrayMinSize,
   IsArray,
   IsEnum,
+  IsNumber,
   IsOptional,
   IsString,
+  Min,
   ValidateNested,
 } from 'class-validator';
 import { FormaPagamento } from '../../common/enums/forma-pagamento.enum';
@@ -56,4 +58,16 @@ export class CriarNotaFiscalDto {
   })
   @IsEnum(FormaPagamento)
   formaPagamento: FormaPagamento;
+
+  @ApiPropertyOptional({
+    example: 5,
+    default: 0,
+    description:
+      'Troco dado ao cliente (grupo pag/vTroco do XML). Só relevante em vendas em dinheiro ' +
+      'com valor recebido maior que o total da nota. Se omitido, assume 0.',
+  })
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  troco?: number;
 }
