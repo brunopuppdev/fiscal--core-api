@@ -241,6 +241,18 @@ describe('DanfcePdfService', () => {
     expect(buffer.subarray(0, 5).toString('latin1')).toBe('%PDF-');
   });
 
+  it('não lança exceção com nome fantasia longo (título grande com characterSpacing, mais sujeito a quebra de linha no novo layout)', async () => {
+    const emitenteNomeLongo: EmitenteConfig = {
+      ...emitenteFixture,
+      nomeFantasia:
+        'Distribuidora de Sucos e Açaí Artesanal do Bruno Marconcini Pupp',
+    };
+
+    await expect(
+      service.gerar(notaFixture(), emitenteNomeLongo),
+    ).resolves.toBeInstanceOf(Buffer);
+  });
+
   it('não lança exceção quando logoPath está vazio ou aponta para um arquivo inexistente', async () => {
     const emitenteSemLogo: EmitenteConfig = {
       ...emitenteFixture,
