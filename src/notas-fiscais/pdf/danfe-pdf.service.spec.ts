@@ -1,9 +1,16 @@
+import { mkdtempSync, rmSync, writeFileSync } from 'fs';
+import { tmpdir } from 'os';
+import { join } from 'path';
 import { EmitenteConfig } from '../../config/configuration';
 import { ModeloDocumento } from '../../common/enums/modelo-documento.enum';
 import { StatusNota } from '../../common/enums/status-nota.enum';
 import { ItemNota } from '../entities/item-nota.entity';
 import { NotaFiscal } from '../entities/nota-fiscal.entity';
 import { DanfePdfService } from './danfe-pdf.service';
+
+// PNG 1x1 transparente mínimo, só para exercitar `doc.image()` com um arquivo real e válido.
+const PNG_1X1_BASE64 =
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=';
 
 // Chave de acesso fictícia (44 dígitos), só para exercitar a geração do DANFE.
 const CHAVE_ACESSO_FIXTURE = '35260812345678000199550010000000421000000010';
@@ -95,6 +102,7 @@ function notaFixture(overrides: Partial<NotaFiscal> = {}): NotaFiscal {
     },
     valorTotal: '25.00',
     formaPagamento: '17', // PIX
+    troco: '0.00',
     xmlAssinado: '<NFe>ASSINADO</NFe>',
     xmlAutorizado: xmlAutorizadoFixture(),
     protocolo: '135260000012345',
@@ -111,6 +119,18 @@ function notaFixture(overrides: Partial<NotaFiscal> = {}): NotaFiscal {
 
 describe('DanfePdfService', () => {
   let service: DanfePdfService;
+  let diretorioTemporario: string;
+  let logoValido: string;
+
+  beforeAll(() => {
+    diretorioTemporario = mkdtempSync(join(tmpdir(), 'danfe-logo-'));
+    logoValido = join(diretorioTemporario, 'logo.png');
+    writeFileSync(logoValido, Buffer.from(PNG_1X1_BASE64, 'base64'));
+  });
+
+  afterAll(() => {
+    rmSync(diretorioTemporario, { recursive: true, force: true });
+  });
 
   beforeEach(() => {
     service = new DanfePdfService();
@@ -203,5 +223,34 @@ describe('DanfePdfService', () => {
     const buffer = await service.gerar(nota, emitenteFixture);
 
     expect(buffer.subarray(0, 5).toString('latin1')).toBe('%PDF-');
+  });
+
+  it('desenha o logotipo no cabeçalho quando logoPath aponta para um PNG válido', async () => {
+    const emitenteComLogo: EmitenteConfig = {
+      ...emitenteFixture,
+      logoPath: logoValido,
+    };
+
+    const buffer = await service.gerar(notaFixture(), emitenteComLogo);
+
+    expect(buffer.subarray(0, 5).toString('latin1')).toBe('%PDF-');
+  });
+
+  it('não lança exceção quando logoPath está vazio ou aponta para um arquivo inexistente', async () => {
+    const emitenteSemLogo: EmitenteConfig = {
+      ...emitenteFixture,
+      logoPath: '',
+    };
+    const emitenteLogoInexistente: EmitenteConfig = {
+      ...emitenteFixture,
+      logoPath: join(diretorioTemporario, 'nao-existe.png'),
+    };
+
+    await expect(
+      service.gerar(notaFixture(), emitenteSemLogo),
+    ).resolves.toBeInstanceOf(Buffer);
+    await expect(
+      service.gerar(notaFixture(), emitenteLogoInexistente),
+    ).resolves.toBeInstanceOf(Buffer);
   });
 });

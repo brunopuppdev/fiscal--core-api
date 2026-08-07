@@ -13,6 +13,7 @@ export interface EmitenteConfig {
   uf: string;
   cep: string;
   telefone?: string;
+  logoPath?: string;
 }
 
 export interface AppConfig {
@@ -79,6 +80,7 @@ export default (): AppConfig => ({
     uf: process.env.EMITENTE_UF ?? 'SP',
     cep: process.env.EMITENTE_CEP ?? '',
     telefone: process.env.EMITENTE_TELEFONE,
+    logoPath: process.env.EMITENTE_LOGO_PATH,
   },
   numeracao: {
     nfeSerie: parseInt(process.env.NFE_SERIE ?? '1', 10),

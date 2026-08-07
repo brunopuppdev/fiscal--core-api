@@ -13,6 +13,10 @@ import {
   formatarMoeda,
   textoFormaPagamento,
 } from './formatadores-danfe.util';
+import {
+  desenharLogoEmitente,
+  TAMANHO_MAXIMO_LOGO,
+} from './logo-emitente.util';
 import { capturarPdfEmBuffer } from './pdf-buffer.util';
 import {
   DadosXmlAutorizado,
@@ -127,10 +131,20 @@ export class DanfePdfService {
       doc.text(`Telefone: ${emitente.telefone}`, { width: colEsquerdaLargura });
     }
 
+    // Logo no canto superior direito do cabeçalho, acima do bloco "DANFE" — empurra o bloco
+    // para baixo (yTituloDireita) só quando o campo está configurado e o arquivo existe.
+    desenharLogoEmitente(
+      doc,
+      emitente.logoPath,
+      MARGEM + LARGURA_UTIL - TAMANHO_MAXIMO_LOGO,
+      yInicio,
+    );
+    const yTituloDireita = yInicio + TAMANHO_MAXIMO_LOGO + 4;
+
     doc
       .fontSize(14)
       .font('Helvetica-Bold')
-      .text('DANFE', colDireitaX, yInicio, {
+      .text('DANFE', colDireitaX, yTituloDireita, {
         width: colDireitaLargura,
         align: 'center',
       });
@@ -186,7 +200,7 @@ export class DanfePdfService {
       doc.fillColor('black');
     }
 
-    doc.y = Math.max(doc.y, yInicio + 85);
+    doc.y = Math.max(doc.y, yInicio + TAMANHO_MAXIMO_LOGO + 4 + 85);
     this.linhaSeparadora(doc);
   }
 

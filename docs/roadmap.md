@@ -21,6 +21,7 @@ Nenhuma promessa de prazo — é uma lista de possibilidades para quem quiser co
 - Carta de correção eletrônica (CC-e).
 - Suporte a outras UFs (começando pelo ambiente SVRS compartilhado).
 - Endpoint HTTP para `NFeConsultaProtocolo4`.
+- Cadastro do emitente persistido no banco em vez de `.env` — hoje todos os dados de negócio do emitente (razão social, nome fantasia, IE, CRT, endereço completo, telefone, caminho do logotipo) vivem em `EmitenteConfig`/`.env` (`src/config/configuration.ts`), misturados com configuração de infraestrutura de verdade (conexão com banco, ambiente SEFAZ, caminho/senha do certificado) que faz sentido continuar em variável de ambiente. Envolveria uma nova entidade/tabela para o emitente (provavelmente uma linha só, já que o projeto é uma instância por CNPJ), endpoint(s) HTTP de cadastro/atualização, e migrar `NotasFiscaisService`/`NfeXmlBuilderService`/os services de PDF (que hoje recebem `EmitenteConfig` via `ConfigService.get('emitente')`) para ler o emitente do banco em vez do `.env`.
 - Suporte a certificado A3 (token/smartcard), hoje só A1 (`.pfx`) é suportado.
 
 ## Como contribuir com o roadmap
